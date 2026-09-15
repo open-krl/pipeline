@@ -23,30 +23,39 @@ Ingest KRL's current timetable edition from a station-centric REST API into a no
 
 ## 2. Source System: The API
 
-Three endpoints, confirmed from the official frontend's JavaScript plus direct requests. Base URL and exact response envelope are configuration; payloads are archived verbatim. Everything below is field-level semantics.
+Three endpoints, confirmed from direct inspection of live responses and operator requests:
+- **Base URL:** `https://www.kci.id` (redirected from `commuterline.id` or called directly).
+- **Network Headers:** Cloudflare bot management is bypassed using standard browser headers (`User-Agent: Mozilla/5.0...`, `Accept: application/json, text/plain, */*`, and `Referer: https://www.kci.id/`).
+- **Response Envelope:** Wrapped JSON: `{ status: 200, data: [...] }`, with `message: "Success"` optionally present on station master. Payloads are archived verbatim. Everything below is field-level semantics.
 
 ### 2.1 `GET /api/krl/stations` ✅
-Station master. Fields: `sta_id`, `sta_name`, `group_wil`, `fg_enable`. Ingestion filter: `fg_enable=1 AND sta_id NOT LIKE 'WIL%'` — `WIL*` rows are regional (Daop) groupings rendered as dropdown separators, not stations. *Open:* confirm all `WIL%` rows are `fg_enable=0`; semantics of `group_wil ≠ 0` (Merak / Yogyakarta–Solo scope?).
+Station master. Envelope: `{ status: 200, message: "Success", data: [...] }`. Fields: `sta_id`, `sta_name`, `group_wil`, `fg_enable`.
+- **Ingestion filter:** `sta_id NOT LIKE 'WIL%'`. `WIL*` rows (`WIL0` Jabodetabek, `WIL1` Merak, `WIL6` Yogyakarta) are regional dropdown section headers rendered with `fg_enable=0`, not physical stations.
+- **Critical discovery — do NOT filter on `fg_enable=1`:** Station `SG` ("SERANG") has `fg_enable=0` in the station master despite being a fully operational station (verified: 14 daily departures in `/api/krl/schedules?stationid=SG` and stops on Merak line itineraries). Using `fg_enable=1` as an ingestion gate drops Serang and breaks foreign keys on Merak line trips.
+- **`group_wil` semantics:** `group_wil=6` identifies Yogyakarta–Solo stations (17 stations). However, Merak line stations are coded `group_wil=0` (identical to Jabodetabek). Thus, `group_wil=0` cannot isolate Jabodetabek from Merak.
 
 ### 2.2 `GET /api/krl/schedules?stationid=&timefrom=&timeto=` ✅
-One station's departures board for the requested window (`HH:MM`; `00:00–23:59` returns the full pattern in one call, verified). Fields per row: `train_id`, `ka_name`, `route_name`, `dest`, `time_est`, `color`, `dest_time`.
+One station's departures board for the requested window (`HH:MM`; `00:00–23:59` returns the full pattern in one call, verified). Envelope: `{ status: 200, data: [...] }`. Fields per row: `train_id`, `ka_name`, `route_name`, `dest`, `time_est`, `color`, `dest_time`.
 
-- `time_est` = **departure at the queried station** — a pattern time (§2.4).
-- `dest_time` = **arrival at the terminus** — confirmed twice by board↔itinerary match (5022D: 06:29 = Tambun row; 5552A: 16:45 = Cikarang row).
-- `dest`, `dest_time`, `route_name`, `color` are **identical across every station's row for a given train** — denormalized trip-level data; both a validation invariant and the anchor for midnight-wrap detection.
+- `time_est` = **departure at the queried station** — formatted as `HH:MM:SS` (seconds strictly `:00` across all board departures).
+- `dest_time` = **arrival at the terminus** — formatted as `HH:MM:SS` (seconds strictly `:00`).
+- `ka_name` = **commercial corridor name** — confirmed (e.g. `"COMMUTER LINE CIKARANG"`, `"COMMUTER LINE BOGOR"`, `"COMMUTER LINE RANGKASBITUNG"`, `"COMMUTERLINE MERAK"`).
+- `dest`, `dest_time`, `route_name`, `color`, `ka_name` are **identical across every station's row for a given train** — denormalized trip-level data; both a validation invariant and the anchor for midnight-wrap detection.
+- **Departure-only boards**: Boards list departures only. A train terminating at station `X` does **not** appear on station `X`'s board as an arrival (`dest == station_name` yields 0 rows across all tested boards). Terminus arrival times are obtained strictly from `dest_time` on upstream departures or from the train itinerary.
 - Board is time-sorted with **exact ties** (BKS: 06:10, 08:03, 09:07, 17:52 each carry two trains) — deterministic tie-breaking (`time_est`, then `train_id`) wherever we sort.
 - Boards are **complete by construction**: a train absent from a station's board does not serve that station. This makes the board fan-out the discovery backbone of the whole system.
 
 ### 2.3 `GET /api/krl/train-schedule?trainid=` ✅
-Full ordered itinerary for one train. Requires the **exact operational ID including suffix** — `5552` → 404, `5552A` → 200 (confirmed, load-bearing). Response: ordered array, origin→terminus, both endpoints inclusive: `station_id`, `station_name`, `time_est`, `transit_station` (bool), `color`, `transit` (type-inconsistent: `""` when empty, `[]` when populated — normalize once, at the boundary).
+Full ordered itinerary for one train. Requires the **exact operational ID including suffix** — `5552` → 404, `5552A` → 200 (confirmed, load-bearing). Envelope: `{ status: 200, data: [...] }`. Response: ordered array, origin→terminus, both endpoints inclusive: `station_id`, `station_name`, `time_est`, `transit_station` (bool), `color`, `transit` (`""` when empty, `string[]` of connecting line hex colors when populated, e.g. `["#ff8095", "#0000ff"]`).
 
+- **Sub-minute granularity**: Unlike station boards which round to `:00`, itinerary `time_est` contains **exact seconds / sub-minute precision** (e.g. `15:41:30` at Rajawali for `5552A`).
 - **Array order is authoritative** — the only source of stop sequence.
 - **Coverage unmeasured** (census pending); hypothesis: every board train has an itinerary. A 404-fallback reconstruction path exists regardless, with provenance.
 - `transit` uses a **legacy color palette** unrelated to board colors — display metadata, never a key. Flags identify transfer points → candidate transfers material (deferred).
 
 ### 2.4 Behavioral profile & operating model
 
-- No auth, plain GET/JSON. Cloudflare bot management present; fetches run from the operator's machine with frontend-identical requests (known to work). A future *server-side* fetcher may need a headless-browser contingency — parked; operations are manual and local.
+- No auth, plain GET/JSON. Base URL: `https://www.kci.id`. Cloudflare bot management is bypassed by sending standard browser headers (`User-Agent` and `Referer: https://www.kci.id/`).
 - **5–10 s latency per call, param-independent** — per-request overhead, not query cost. Consequences: concurrency-limited fan-out; the census is a **one-time, resumable, cache-backed cost** (~1,000–1,500 calls, once per edition, ever).
 - **No date parameter exists in the frontend; no history is served.** The server holds the current edition only.
 - **Operating model (strong prior, from domain knowledge): the API is a timetable document server.** Same schedule every weekday; weekends may differ. The tail rows at board top (00:02–01:04 at BKS) are the *pattern's own tail*, not yesterday's leftovers — under a live-board reading they would need date stamps to be interpretable across captures, and none exist. Confirmation: the three-capture diff (§9). Free optional corroboration: fetch one board twice in one day and diff.
@@ -86,19 +95,19 @@ The central discovery. `train_id` is a two-part identifier whose parts behave di
 
 - Suffixes carry **zero reliable schedule signal** — never infer sameness/difference of times from letters; verify with the fingerprint **(terminus station, arrival time ± tolerance)**.
 - Expected letter distance API−PDF ∈ {0, +1}; anything else is a mis-join or renumbering → auto-flag.
-- Grammar (all ~170 observed IDs conform): `^(\d+)([A-E])?(F)?$` → `base_train_no`, `revision`, F-flag (F recoverable from the full ID; the F *column* is a derived observation, §6.6). Unparseable IDs → quarantine, never silent coercion.
+- Grammar (100% of 749 observed unique IDs conform): `^(\d+)([A-E])?(F)?$` → `base_train_no`, `revision`, F-flag (F recoverable from the full ID; the F *column* is a derived observation, §6.6). Unparseable IDs → quarantine, never silent coercion.
 - Cross-source joins use base number **plus fingerprint** — base alone can be reused across editions.
 - Base numbers appear corridor-structured (5xxx/6xxx Cikarang, 16xx Rangkasbitung, 20xx Tangerang) — anomaly heuristic only, unverified.
 
 ### 4.2 The service day — arithmetic, not collection
 - Operational day runs ~04:00 to ~01:30. BKS observed: dead band **01:04–04:12**, first departure 04:12, tail 00:02–01:04 at board top.
-- **Clock times below the dead band belong to the previous service day** — a global rule for converting `HH:MM` to service-day seconds; no per-trip origin knowledge needed. For itineraries, a wrap-detection walk over array order suffices (strict `<`; equal consecutive times are dwell, not wrap).
+- **Clock times below the dead band belong to the previous service day** — a global rule for converting `HH:MM:SS` to service-day seconds; no per-trip origin knowledge needed. For itineraries, a wrap-detection walk over array order suffices (strict `<`; equal consecutive times are dwell, not wrap).
 - **One full-day capture contains the complete pattern, including its tail.** Physical-day reconstruction (which calendar-date instance a tail row belongs to) is neither possible from this API nor needed for GTFS.
 
 ### 4.3 `route_name` and physical routing
 Grammar: `ORIGIN-TERMINUS[ VIA X]`, concatenated names (`KAMPUNGBANDAN`, `TANAHABANG`). Consequences:
 
-- **Origin comes free** — parse the prefix (cross-checked against, no longer derived from, min-time). Needs name normalization to `sta_id` (`TANAHABANG` → `THB`).
+- **Origin comes free** — parse the prefix (cross-checked against, no longer derived from, min-time). Needs name normalization to `sta_id` (`TANAHABANG` → `THB`). **Verified:** stripping all whitespace from station names (`sta_name.replace(/\s+/g, '')`) matches 100% of origin/dest tokens across all 41 observed route patterns.
 - `dest` is display text, may include ` VIA X` — strip before station mapping.
 - **`VIA` is load-bearing**: BKS→KPB is 59–63 min unlabeled but 45 min `VIA PSE`; 5552A proves the unlabeled route runs via the City line (Rajawali–Kemayoran–Kramat). Distinct physical paths = distinct GTFS patterns, not cosmetic variants.
 
@@ -158,13 +167,13 @@ CREATE TABLE trips (
     trip_id           TEXT NOT NULL,     -- FULL string incl. suffix: '5022D', '5552A', '1163F'
     base_train_no     INTEGER NOT NULL,  -- parsed; cross-source join key
     revision          TEXT CHECK (revision IS NULL OR length(revision) = 1),
-    line_name         TEXT NOT NULL,     -- assumed ← ka_name (§12, pending confirmation)
+    line_name         TEXT NOT NULL,     -- confirmed ← ka_name (commercial corridor, e.g. 'COMMUTER LINE CIKARANG')
     route_name_raw    TEXT NOT NULL,
     headsign          TEXT NOT NULL,     -- raw dest text (may contain ' VIA X')
     origin_station_id TEXT REFERENCES stations(sta_id),
     dest_station_id   TEXT REFERENCES stations(sta_id),
-    origin_time       TEXT NOT NULL,     -- display 'HH:MM'
-    dest_time         TEXT NOT NULL,
+    origin_time       TEXT NOT NULL,     -- display 'HH:MM:SS'
+    dest_time         TEXT NOT NULL,     -- display 'HH:MM:SS'
     origin_secs       INTEGER NOT NULL,  -- service-day seconds; all arithmetic lives here
     dest_secs         INTEGER NOT NULL,
     total_stops       INTEGER NOT NULL,  -- stop EVENTS, not distinct stations
@@ -296,20 +305,21 @@ TypeScript on Bun (native TS execution; static typecheck remains a separate CI g
 
 ## 12. Open Questions & Tests
 
-| Question | Test | Consequence |
-|---|---|---|
-| **Static vs. date-aware backend** | The three-capture diff (+ optional same-day double-fetch) | Calendar strategy branch |
-| Weekday homogeneity (Thu == Fri) | Assumed (domain knowledge); PDF reconciliation cross-checks; a 2nd weekday capture is a cheap optional falsifier | Universe completeness |
-| Itinerary coverage rate | The census | Whether fallback path is exercised or insurance |
-| F + revision co-occurrence (`1614AF`?) | PDF inspection | Grammar totality |
-| Racket = stitched trips? | KPB duplicate-ID check (day-1, free) | Loop representation (defense stands either way) |
-| Terminus station's own board rows | CKR board check (day-1, free) | 404-fallback terminus synthesis |
-| Cuti bersama behavior | PDF wording / opportunistic | Calendar exception handling |
-| Weekend-only trains exist? | Sat/Sun captures — the data itself | Universe + calendar |
-| Time granularity / `timeto=23:59` edge | Day-1 payload inspection | Window-edge loss (only if seconds exist) |
-| `WIL%` / `group_wil ≠ 0` | Day-1 station-master inspection | Ingestion filter; scope |
-| `line_name` ← `ka_name`? | Day-1 payload inspection | GTFS route modeling (currently an assumption) |
-| Holiday coverage per year | Manual SKB maintenance; loader hard-warns on uncovered years | `day_type` correctness |
+| Question | Test / Finding | Consequence / Resolution | Status |
+|---|---|---|---|
+| **Static vs. date-aware backend** | The three-capture diff (+ optional same-day double-fetch) | Calendar strategy branch | Open |
+| Weekday homogeneity (Thu == Fri) | Assumed (domain knowledge); PDF reconciliation cross-checks; a 2nd weekday capture is a cheap optional falsifier | Universe completeness | Open |
+| Itinerary coverage rate | The census | Whether fallback path is exercised or insurance | Open |
+| F + revision co-occurrence (`1614AF`?) | PDF inspection (or full capture census) | Grammar totality | Open |
+| Racket = stitched trips? | KPB duplicate-ID check (day-1, free) | Loop representation (defense stands either way) | Open |
+| **Terminus station's own board rows** | Checked Tanah Abang, Manggarai, Bekasi boards: 0 arriving rows (`dest == station_name`). | Boards are **departure-only**. Terminus arrivals synthesized via upstream `dest_time` or itinerary. | **Resolved** ✅ |
+| Cuti bersama behavior | PDF wording / opportunistic | Calendar exception handling | Open |
+| Weekend-only trains exist? | Sat/Sun captures — the data itself | Universe + calendar | Open |
+| **Time granularity** | Board departures strictly `HH:MM:00`. Itineraries have sub-minute / exact seconds (e.g. `15:41:30`). | Store as `HH:MM:SS` and integer service-day seconds. Zero window-edge loss. | **Resolved** ✅ |
+| **`WIL%` / `group_wil ≠ 0`** | `WIL%` are dropdown headers with `fg_enable=0`. `group_wil=6` is Yogyakarta, `0` is Jabodetabek + Merak. **Trap:** Serang (`SG`) has `fg_enable=0` despite running 14 daily trains. | Ingestion filter must be `sta_id NOT LIKE 'WIL%'`. Do NOT gate on `fg_enable=1`. | **Resolved** ✅ |
+| **`line_name` ← `ka_name`?** | `ka_name` verified across all boards and itineraries (e.g. `"COMMUTER LINE CIKARANG"`, `"COMMUTERLINE MERAK"`). | `line_name` sourced directly from `ka_name`. GTFS route mapping confirmed. | **Resolved** ✅ |
+| **`transit` field schema** | Itinerary inspection: `""` when empty; `string[]` of connecting line hex colors when populated (e.g. `["#ff8095", "#0000ff"]`). | Zod schema normalized to `string[]` at boundary. | **Resolved** ✅ |
+| Holiday coverage per year | Manual SKB maintenance; loader hard-warns on uncovered years | `day_type` correctness | Open |
 
 ## 13. Why This Architecture
 
@@ -324,4 +334,4 @@ In a nutshell, capture it three times to read its day-types, census it once to e
 
 ---
 
-**Review pointers** — the three places I introduced something new rather than transcribing, so you can veto: **(1)** `line_name ← ka_name` is still an assumption (§6, §12 — you've seen the payloads, I haven't); **(2)** the "weekday homogeneity" row in §12 makes your "same every weekday" prior an explicit, falsifiable assumption rather than silent truth; **(3)** schema deltas beyond the dialect swap: `snapshots.archive_commit` and the composite FK on `trip_stops` — both additions, both cheap, say the word if you don't want them.
+**Review pointers** — the three places I introduced something new rather than transcribing, so you can veto: **(1)** `line_name ← ka_name` is confirmed by live payload inspection (§2.2, §2.3, §12); **(2)** the "weekday homogeneity" row in §12 makes your "same every weekday" prior an explicit, falsifiable assumption rather than silent truth; **(3)** schema deltas beyond the dialect swap: `snapshots.archive_commit` and the composite FK on `trip_stops` — both additions, both cheap, say the word if you don't want them.
