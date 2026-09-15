@@ -1,6 +1,6 @@
 # Design & Discovery Document — KRL Schedule Database
 
-**Version:** 1.1  
+**Version:** 1.2  
 ---
 
 ## 1. Purpose & Deliverables
@@ -8,13 +8,13 @@
 Ingest the current Kereta Commuter Indonesia (KRL) timetable edition from KCI's station-centric REST API into a normalized relational database, producing:
 
 1. **Relational core** — stations, trips, and ordered stop-time sequences.
-2. **Service calendar** per trip — resolved strictly via empirical set-difference across day-type captures (weekday, Saturday, Sunday) cross-referenced with national holidays.
+2. **Service calendar** per trip — resolved via an evidence-graded fold over available day-type captures (weekday, Saturday, Sunday) cross-referenced with national holidays, producing provisional calendars at $N=1$ and fully resolved presence masks at $N=3$.
 3. **GTFS-compatible export** — `routes`, `trips`, `stop_times`, `calendar`, and `calendar_dates` (transfers deferred).
 4. **Raw-response archive** — a deterministic, versioned snapshot archive of the upstream API responses (the API provides no revision history; our raw archive constitutes the permanent record of this edition).
 5. **Export validation report** — integrity audit covering graph completeness, dead-band enforcement, sequence monotonicity, and calendar masks.
 
 ### Scope Boundaries
-* **In Scope (v1.1):** Three day-type captures (weekday, Saturday, Sunday), a single enrichment census, offline validation/build pipeline, and GTFS export.
+* **In Scope (v1.2):** Single-snapshot baseline bootstrap ($N \ge 1$), incremental evidence-graded multi-capture calendar enrichment (weekday, Saturday, Sunday), offline validation/build pipeline (pure functional fold), and GTFS export.
   - **Regional Scope:** Active initial scope is `jabodetabek` (`group_wil: 0`, covering 94 operational stations across Jabodetabek and the Merak branch).
   - **Yogyakarta–Solo Readiness:** The Yogyakarta–Solo & Prameks network (`group_wil: 6`, 17 stations) is fully supported by the API and schema, but decoupled via modular `region_scope` configuration to prevent cross-network invariant failure.
 * **Dropped / Out of Scope:** PDF timetable schedule reconciliation and text-layer scraping. PDF timetable extraction has been dropped due to fragile layout formatting, manual publishing discrepancies, and high parsing maintenance overhead. The operational API is the sole source of truth.
@@ -198,7 +198,8 @@ While current KRL operational practice models the circular loop line as stitched
 KRL denotes operational exceptions via several mechanisms:
 - **`F` Suffix (Fakultatif):** Indicates services scheduled to run conditionally, routinely suspended on Saturdays, Sundays, and national holidays (e.g., `1163F`).
 - **Unmarked Exceptions:** Specific lines (e.g., Rangkasbitung branch corridors) mark non-weekend runs using tabular operational policies rather than identifier suffixes. An `F` suffix is therefore sufficient to indicate non-daily service, but not necessary.
-- **Empirical Calendar Determination:** Service calendar coverage (`daily`, `weekday_only`, `weekend_only`) is determined strictly via empirical set-difference across captures (Weekday vs. Saturday vs. Sunday). A reference Indonesian holidays table (`holidays`) accounts for statutory non-operational days. Snapshot day types are assigned strictly by calendar date against national holiday schedules, never inferred from snapshot payload content.
+- **Presence Mask Model (`trip_calendar`):** Rather than forcing a rigid 3-value enum (`daily`, `weekday_only`, `weekend_only`) that cannot represent asymmetric service (such as Monday–Saturday runs without Sunday service on branch lines), calendar coverage is modeled as a presence mask over observed day types (`runs_weekday`, `runs_saturday`, `runs_sunday`). The diff *is* the data, cleanly representing all $2^3 = 8$ day-type permutations.
+- **Evidence-Graded Calendar Resolution:** The service calendar is not a build prerequisite, but an evidence-graded fold recomputed across whatever same-edition snapshots exist in the raw archive. At $N=1$ capture (e.g., weekday only), trips are marked `calendar_state = 'provisional'` with observed-day coverage. Once all three day types (weekday, Saturday, Sunday) are captured, `calendar_state` advances to `'resolved'`. National holiday captures cross-referenced against the `holidays` table contribute to fakultatif (`F`) suspension verification and exception dates (`calendar_dates.txt`), not baseline weekly masks.
 
 ### 4.6 Stop-Time Semantics
 The API provides exactly one scheduled time per stop:
@@ -231,7 +232,7 @@ The API provides exactly one scheduled time per stop:
 ┌────────────────────────────────────────────────────────────────────────┐
 │ INFERRED / DERIVED VIA CROSS-CAPTURE INTEGRATION                       │
 │ • Station Foreign Key Resolution                                       │
-│ • Calendar Allocation (Weekday / Saturday / Sunday Capture Diff)       │
+│ • Calendar Allocation (Progressive Presence Mask Fold & Holiday Audit) │
 │ • Fakultatif Observation Status                                        │
 │ • 404-Fallback Itinerary Reconstruction (via Board Synthesis)          │
 └────────────────────────────────────────────────────────────────────────┘
@@ -242,7 +243,7 @@ The API provides exactly one scheduled time per stop:
 | **Direct API Attributes** | Station master (`sta_id`, `sta_name`, `group_wil`, `fg_enable`); station board departure times; destination name + arrival time; line name (`ka_name`); color code; `route_name`; ordered itinerary stops, times, and transit flags. |
 | **Deterministic Derivations** | `base_train_no`, `revision`, and `F` parsed from `train_id`; origin and destination station names from `route_name`; service-day integer seconds; stop sequence index. |
 | **Supplementary External Data** | Station coordinates (`lat`, `lon`) sourced from version-controlled `data/station_coordinates.csv` and joined on `sta_id`. Statutory holiday schedules (`holidays`). |
-| **Inferred (Requires Cross-Capture Logic)** | Origin/terminus resolved to station foreign keys; service calendar patterns (via multi-capture diff and holiday cross-reference); fakultatif operational status; candidate transfer edges. |
+| **Inferred (Requires Cross-Capture Logic)** | Origin/terminus resolved to station foreign keys; service calendar presence masks (via progressive fold over observed captures and holiday cross-reference); fakultatif operational status; candidate transfer edges. |
 | **Unobtainable from Source** | Intermediate arrival times / dwell intervals; historical timetable revisions; real-time delay tracking. |
 
 ---
@@ -294,7 +295,6 @@ CREATE TABLE trips (
     total_stops         INTEGER NOT NULL,  -- Total stop events
     color               TEXT NOT NULL,     -- Line color hex
     is_fakultatif       INTEGER CHECK (is_fakultatif IN (0, 1)),
-    service_pattern     TEXT CHECK (service_pattern IS NULL OR service_pattern IN ('daily', 'weekday_only', 'weekend_only')),
     source              TEXT NOT NULL CHECK (source IN ('itinerary', 'reconstructed')),
     itinerary_status    TEXT NOT NULL CHECK (itinerary_status IN ('200', '404', 'unprobed')),
     first_seen_snapshot INTEGER REFERENCES snapshots(snapshot_id),
@@ -303,6 +303,19 @@ CREATE TABLE trips (
 ) STRICT;
 
 CREATE INDEX idx_trips_base ON trips (base_train_no);
+
+-- Service calendar presence mask; pure fold over captured snapshots in active edition
+CREATE TABLE trip_calendar (
+    timetable_version   INTEGER NOT NULL,
+    trip_id             TEXT NOT NULL,
+    runs_weekday        INTEGER NOT NULL DEFAULT 0,  -- Present in ≥1 weekday capture
+    runs_saturday       INTEGER NOT NULL DEFAULT 0,  -- Present in ≥1 Saturday capture
+    runs_sunday         INTEGER NOT NULL DEFAULT 0,  -- Present in ≥1 Sunday capture
+    captured_day_types  INTEGER NOT NULL,            -- Count of distinct day types observed at build (1 to 3)
+    calendar_state      TEXT NOT NULL CHECK (calendar_state IN ('provisional', 'resolved')),
+    PRIMARY KEY (timetable_version, trip_id),
+    FOREIGN KEY (timetable_version, trip_id) REFERENCES trips (timetable_version, trip_id)
+) STRICT;
 
 CREATE TABLE trip_stops (
     timetable_version INTEGER NOT NULL,
@@ -331,26 +344,31 @@ CREATE TABLE holidays (
 4. **Integer Seconds Alongside Text Strings:** Text columns retain authentic timetable display times (`HH:MM:SS`). Integer seconds normalize times relative to the operational start-of-day, allowing simple arithmetic across midnight ($t \ge 86,400\text{ s}$).
 5. **Traceability via `archive_commit`:** Every snapshot links directly to the git commit hash containing the canonical raw response payloads.
 6. **No External PDF Staging Tables:** Dropping the brittle PDF reconciliation phase removes speculative text extraction tables (`pdf_trains`), maintaining a schema backed entirely by verified API data.
+7. **Presence Mask Table (`trip_calendar`) vs. Enum:** Decoupling calendar presence from `trips` replaces a rigid 3-value enum with explicit presence flags (`runs_weekday`, `runs_saturday`, `runs_sunday`). This natively models all 8 day-type permutations (such as Monday–Saturday branch operations) and stores raw empirical evidence directly, allowing `build` to operate as an idempotent pure fold over $N \ge 1$ captures without in-place mutations.
 
 ---
 
 ## 7. Validation Invariants
 
-The ingestion engine executes eleven assertions during the build process. Any invariant violation halts compilation and flags the capture:
+The ingestion engine executes twelve assertions during the build process. Any invariant violation halts compilation and flags the capture:
 
-1. **Intra-Trip Attribute Consistency:** Across all station boards where a `train_id` appears, `route_name`, `dest`, `dest_time`, and `color` must be byte-for-byte identical.
+1. **Intra-Trip Attribute Consistency:** Across all station boards where a `train_id` appears within a capture, `route_name`, `dest`, `dest_time`, and `color` must be byte-for-byte identical.
 2. **Minimum Board Occurrence ($\ge 2$):** A valid operational trip must appear on at least two distinct station departure boards (origin and at least one upstream station; terminus has no departure entry). A single-station appearance signals a dropped upstream connection or API truncation.
 3. **Dead-Band Assertion:** Zero scheduled departures may exist network-wide between 01:30:00 and 03:30:00.
-4. **Board-Itinerary Time Congruence:** For every station board row, `time_est` must match the corresponding itinerary stop entry for that train.
+4. **Board-Itinerary Time Congruence:** For every station board row, `time_est` must match the corresponding itinerary stop entry for that train. Evaluated per snapshot. If an upstream date-aware schedule alters itinerary times for a stable `train_id` on weekends, this invariant fails immediately, signaling date-aware itinerary variance and instructing widening the census cache key to `(train_id, day_type)`.
 5. **Terminus Alignment:** The final scheduled stop in a train's itinerary must match the trip-level `dest_time` and `dest` station.
 6. **Strict Monotonicity:** Stop sequences must exhibit strictly non-decreasing service-day seconds:
    $$\text{secs}_i \le \text{secs}_{i+1}$$
    Consecutive equal times are permitted (dwell); negative deltas trigger immediate invariant failure.
 7. **Identifier Grammar Adherence:** 100% of discovered `train_id`s must conform to the regex `^(\d+)([A-E])?(F)?$`. Violations are isolated to quarantine tables.
-8. **Cross-Capture Suffix Transition Bounds:** When comparing trip revisions across capture editions for a stable base number, operational suffix drift must advance incrementally ($\le +1$). Skipping revisions or unparseable mutations flags service path changes.
+8. **Cross-Capture Suffix Transition Bounds:** When comparing trip revisions across captures within the same timetable edition for a stable base number, operational suffix drift must advance incrementally ($\le +1$). Pairwise revision comparison is strictly evaluated across *same-day-type* captures (a weekend variant `5022E` vs weekday `5022D` is expected calendar variance, not edition drift). Vacuous at $N=1$ same-day-type capture.
 9. **Referential Integrity on Inferred Stations:** All station identifiers extracted from `route_name` or itinerary entries must resolve against valid, non-header rows in the `stations` table (`sta_id NOT LIKE 'WIL%'`).
 10. **Atomic Capture Integrity:** If any station board query experiences an unrecoverable failure or network timeout during a capture run, the entire capture is marked `degraded` and rejected for build purposes.
-11. **Cross-Capture Edition Consistency:** All captures feeding an export within the same `region_scope` must share an identical timetable edition hash. Hashing is scoped to the active region's stations, ensuring an upstream schedule revision in Yogyakarta does not invalidate a concurrent Jabodetabek campaign. If an upstream timetable change occurs mid-campaign within the active scope, the run must be aborted and restarted.
+11. **Cross-Capture Edition Consistency:**
+    - **Edition Family Membership:** All captures feeding an export within the same `region_scope` must share an identical station master payload hash (physical station catalog, `group_wil`, and `fg_enable` do not vary by day type). Weekend captures join the weekday edition family via this hash.
+    - **Within-Day-Type Board Equality:** Station board response hash equality is enforced *only within the same day type* (e.g., comparing a Tuesday capture against a Thursday capture to detect mid-week revision drift). Cross-day-type differences (weekday vs. Saturday) are classified as *calendar evidence*, never edition drift.
+    - Vacuous at $N=1$ capture.
+12. **Cross-Capture Trip-Attribute Consistency:** Across distinct same-edition captures, any identical `trip_id` must carry byte-for-byte identical trip-level attributes (`route_name_raw`, `headsign`, `dest_station_id`, `dest_time`, `origin_secs`, `color`). Any discrepancy signals conflicting operational variants sharing an ID across day types, triggering immediate quarantine into day-type-scoped variants. Vacuous at $N=1$ capture.
 
 ---
 
@@ -395,43 +413,56 @@ Execution runs via a local TypeScript/Bun CLI toolchain requiring zero long-runn
 
 ```
        ┌───────────┐
-       │  capture  │ x 3 runs (Weekday, Saturday, Sunday)
+       │  capture  │ Independent run (any day, idempotent, N ≥ 1)
        └─────┬─────┘
              │
              ▼
        ┌───────────┐
-       │  census   │ x 1 run (Fetch itineraries for all unique IDs)
+       │  census   │ Incremental, resumable (cache-keyed per train_id)
        └─────┬─────┘
              │
              ▼
        ┌───────────┐
-       │   build   │ Run offline (Invariants, DB loading, fallback)
-       └─────┬─────┘
+       │   build   │ Pure functional fold over N ≥ 1 snapshots in archive
+       └─────┬─────┘ (Invariants, DB compilation, provisional/resolved calendar)
              │
              ▼
        ┌───────────┐
-       │  export   │ Generate GTFS feed and validation report
+       │  export   │ Compiles GTFS (conservative observed-day masks)
        └─────┬─────┘
              │
-             ▼
-       ┌───────────┐
-       │  detect   │ (Optional) Diff single board months later for drift
-       └───────────┘
+             ├──────────────────────────┐
+             ▼                          ▼
+       ┌───────────┐              ┌───────────┐
+       │ calendar  │ (Optional)   │  detect   │ (Optional)
+       │ (diff viz)│ Diff report  │ (drift)   │ Single-board probe
+       └───────────┘              └───────────┘
 ```
+
+### Stage Contracts
+
+| Stage | Input | Output | Applicability Condition | Purity |
+|---|---|---|---|---|
+| `capture` | `holidays`, config | Git commit + raw payload files | Any day, independent | Side-effectful, idempotent |
+| `census` | $\ge 1$ snapshot | Itinerary raw payloads | Any time; incremental, resumable | Side-effectful, cache-keyed |
+| `build` | Archive + config | SQLite DB (`trip_calendar`, etc.) | $\ge 1$ complete snapshot, same edition | **Pure fold, deterministic** |
+| `export` | DB + config | GTFS CSVs + validation report | Any build | Pure |
+| `calendar` | DB / Archive | Set-difference report & diff table | $\ge 2$ same-edition day types | Pure, read-only |
+| `detect` | Single station board | Drift report vs. active edition | Any time post-build | Side-effectful probe |
 
 ### CLI Command Reference
 - **`capture`**: Evaluates the current date against the `holidays` table, displays the calculated `day_type`, prompts for user confirmation, queries the station master, and fans out across all station departure boards (~85 stations, concurrency 5, ~3 minutes total). Commits raw payloads to git.
-- **`census`**: Reads all discovered `train_id` values across existing snapshot captures, checks the local payload cache, and issues requests for missing itineraries (~1,000–1,500 calls, concurrency 4, ~35–40 minutes). Resumable at any point.
-- **`build`**: Executes database migrations, evaluates all 11 validation invariants, reconciles 404 itineraries via topological reconstruction, and populates the SQLite tables inside a single atomic transaction.
-- **`export`**: Compiles GTFS specification CSV files (`agency`, `stops`, `routes`, `trips`, `stop_times`, `calendar`, `calendar_dates`) and produces an export summary and validation report.
+- **`census`**: Reads all discovered `train_id` values across existing snapshot captures, checks the local payload cache, and issues requests for missing itineraries (~1,000–1,500 calls, concurrency 4, ~35–40 minutes). Resumable and incremental; fetches only unprobed IDs.
+- **`build`**: Pure functional fold over all raw committed snapshots for the active edition. Evaluates all 12 validation invariants, populates relational tables, reconciles 404 itineraries via topological reconstruction, and computes `trip_calendar` presence masks (`calendar_state = 'provisional'` when $<3$ day types observed; `'resolved'` when weekday, Saturday, and Sunday are all captured). Fully offline, idempotent, and executed within a single atomic transaction.
+- **`export`**: Compiles GTFS specification CSV files (`agency`, `stops`, `routes`, `trips`, `stop_times`, `calendar`, `calendar_dates`) and produces an export summary and validation report. In provisional calendar states, exports conservative observed-day masks. Supports `--require-resolved-calendar` to enforce production gatekeeping.
+- **`calendar`**: (Optional read-only tool) Pretty-prints the three-way set-difference across day types for human review, outputting empirical schedule identity statistics (verifying static vs. date-aware behavior).
 - **`detect`**: Probes a single reference station board (e.g., Manggarai or Bekasi) and compares the resulting signature with the active database edition to detect unannounced timetable revisions.
 
-### Phased Runbook
-1. **Weekday Capture:** Execute `capture` on a confirmed standard working day (Tuesday, Wednesday, or Thursday). Verify baseline parameters (Serang operational status, time precision, dead-band boundaries).
-2. **Weekend Captures:** Execute `capture` on the subsequent Saturday and Sunday.
-3. **Capture Differentiation:** Execute three-way set-difference to categorize `daily`, `weekday_only`, and `weekend_only` runs.
-4. **Enrichment Census:** Run `census` once to resolve complete itineraries for all unique discovered trains.
-5. **Build & Export:** Execute `build` to generate the normalized SQLite database, followed by `export` to produce production GTFS feeds.
+### Phased Runbook (v1.2)
+1. **Day-1 Baseline Bootstrap:** Execute `capture` on a confirmed standard working day (Tuesday, Wednesday, or Thursday). Run `census` for discovered trains, followed immediately by `build` and `export`. A complete, functional SQLite database and provisional weekday GTFS feed are operational on day one.
+2. **Weekend Enrichment (Order-Free, Incremental):** Execute `capture` on the subsequent Saturday and Sunday. Run `census` (which executes in minutes, fetching only newly discovered delta trains).
+3. **Pure Re-Fold & Calendar Resolution:** Re-run `build`. The engine refolds all available snapshots, promoting `trip_calendar.calendar_state` to `'resolved'` once all three day types are present.
+4. **Final Export & Diff Verification:** Run `calendar` to print the empirical verification report. Run `export --require-resolved-calendar` to emit the production GTFS archive.
 
 ### Failure Policy
 Transient network failures during `capture` or `census` trigger exponential backoff retry. Unrecoverable failures mark the affected capture run as `degraded`. Degraded captures are retained in the raw archive for diagnostic purposes but are strictly barred from the `build` process.
@@ -442,7 +473,7 @@ Transient network failures during `capture` or `census` trigger exponential back
 - **`routes.txt`**: Mapped from commercial `ka_name` strings (e.g., Cikarang Line, Bogor Line).
 - **`trips.txt`**: Keyed by `trip_id`; `trip_headsign` maps to `headsign`; routing variations retain explicit pattern signatures.
 - **`stop_times.txt`**: Stop times derived from integer service-day seconds formatted as `HH:MM:SS` (values past 23:59:59 format continuously as `24:XX:XX`, conforming to GTFS standard).
-- **`calendar.txt` / `calendar_dates.txt`**: Service intervals populated via multi-capture diffing and cross-referenced with statutory holidays.
+- **`calendar.txt` / `calendar_dates.txt`**: Service intervals generated directly from `trip_calendar` presence masks. Under provisional state, masks activate observed day types only (`monday..friday = 1, saturday = 0, sunday = 0`), preventing false transit claims. Exceptions for statutory holidays and `F` suffix suspensions map to `calendar_dates.txt`.
 
 ---
 
@@ -475,6 +506,7 @@ Transient network failures during `capture` or `census` trigger exponential back
 | **11** | **Embedded SQLite Engine (STRICT Mode)**. | Centralized PostgreSQL instance. | Minimizes operational overhead, avoids database server maintenance, and aligns with potential edge deployment targets (Cloudflare D1). |
 | **12** | **Region-Scoped Ingestion & Fingerprinting**. | Global monolithic capture across all stations nationwide. | KCI operates two geographically disjoint commuter networks (Jabodetabek/Merak with `group_wil: 0` vs Yogyakarta/Solo with `group_wil: 6`). Regional scoping decouples capture campaigns, isolates edition hash validation (Invariant 11), and allows expanding to Yogyakarta later via a single configuration parameter without invalidating historical snapshots. |
 | **13** | **Supplementary Station Coordinates via Decoupled CSV**. | Relying solely on API attributes or hardcoding coordinates in migrations. | GTFS `stops.txt` strictly mandates `stop_lat` and `stop_lon`, which the upstream REST API does not publish. Maintaining coordinates in a version-controlled `data/station_coordinates.csv` joined on `sta_id` during `build` cleanly decouples manual/external geospatial enrichment from upstream API captures while guaranteeing reproducible offline builds. |
+| **14** | **Single-Snapshot Bootstrap with Incremental Calendar Resolution**. | (a) Retaining 3-capture build precondition; (b) Mutable incremental DB update command. | `build` accepts any $N \ge 1$ complete same-edition snapshots. The service calendar is an evidence-graded pure fold recomputed on every build, not a campaign precondition. Edition family membership is determined by region-scoped station-master hash; board hash equality is enforced strictly within day types. Eliminates campaign deadlock, enables Day-1 working GTFS exports, and preserves deterministic offline rebuilds. |
 
 ---
 
@@ -482,7 +514,7 @@ Transient network failures during `capture` or `census` trigger exponential back
 
 | Verification Area | Empirical Test | Status | Architectural Resolution |
 |---|---|:---:|---|
-| **Backend Static vs. Date-Aware State** | Three-way diff between Weekday, Saturday, and Sunday captures. | In Progress | Authoritative calendar source: empirical three-way diffing across day types resolves service patterns. PDF parsing is discarded. |
+| **Backend Static vs. Date-Aware State** | Three-way diff between Weekday, Saturday, and Sunday captures. | Assumed Resolvable Post-Hoc | Decoupled from build gating. Evaluated as an evidence-graded fold over available day types; the pipeline emits the static vs. date-aware verdict as a build report artifact once $\ge 2$ day types are captured. |
 | **Terminus Board Rows** | Queried major hub boards (Tanah Abang, Manggarai, Bekasi) using `dest == sta_name`. | **Verified** ✅ | Yields 0 records. Station boards are confirmed departure-only. Terminus arrivals are derived from `dest_time`. |
 | **Time Granularity** | Compared board payload times against train-schedule itinerary times. | **Verified** ✅ | Station boards round departures to `:00`. Itineraries expose exact sub-minute seconds (e.g., `15:41:30`). Both stored. |
 | **Station Dropdown Headers** | Verified structural headers starting with `WIL%` in station master. | **Verified** ✅ | Rows are UI section headers with `fg_enable=0`. Filtered via `sta_id NOT LIKE 'WIL%'`. |
@@ -507,7 +539,7 @@ Transient network failures during `capture` or `census` trigger exponential back
                                                         │
                                                         ▼
 ┌──────────────┐                                ┌────────────────┐
-│ 11 Build-Time│◀──────( Invariant Engine )──────│ SQLite STRICT  │
+│ 12 Build-Time│◀──────( Invariant Engine )──────│ SQLite STRICT  │
 │  Assertions  │                                │  Database Core │
 └──────────────┘                                └───────┬────────┘
                                                         │
@@ -520,5 +552,5 @@ Transient network failures during `capture` or `census` trigger exponential back
 The system guarantees schedule correctness through four complementary design layers:
 - **Exhaustive Discovery:** Departure boards provide complete spatial and temporal coverage of the active network without relying on heuristic ID guessing.
 - **Authoritative Enrichment:** Stop sequences and sub-minute arrival timings are populated directly from official itinerary arrays.
-- **Fail-Fast Invariant Suite:** Eleven strict structural invariants prevent corrupted, drifted, or truncated upstream data from silently landing in release builds.
+- **Fail-Fast Invariant Suite:** Twelve strict structural invariants prevent corrupted, drifted, or truncated upstream data from silently landing in release builds.
 - **Permanent Archival Foundation:** Committing deterministic, raw JSON payloads decouples downstream data modeling from the upstream collection process, ensuring full reproducibility regardless of external API lifecycles.
