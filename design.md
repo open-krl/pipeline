@@ -241,6 +241,7 @@ The API provides exactly one scheduled time per stop:
 |---|---|
 | **Direct API Attributes** | Station master (`sta_id`, `sta_name`, `group_wil`, `fg_enable`); station board departure times; destination name + arrival time; line name (`ka_name`); color code; `route_name`; ordered itinerary stops, times, and transit flags. |
 | **Deterministic Derivations** | `base_train_no`, `revision`, and `F` parsed from `train_id`; origin and destination station names from `route_name`; service-day integer seconds; stop sequence index. |
+| **Supplementary External Data** | Station coordinates (`lat`, `lon`) sourced from version-controlled `data/station_coordinates.csv` and joined on `sta_id`. Statutory holiday schedules (`holidays`). |
 | **Inferred (Requires Cross-Capture Logic)** | Origin/terminus resolved to station foreign keys; service calendar patterns (via multi-capture diff and holiday cross-reference); fakultatif operational status; candidate transfer edges. |
 | **Unobtainable from Source** | Intermediate arrival times / dwell intervals; historical timetable revisions; real-time delay tracking. |
 
@@ -258,6 +259,8 @@ CREATE TABLE stations (
     sta_name    TEXT NOT NULL,
     group_wil   INTEGER NOT NULL,
     fg_enable   INTEGER NOT NULL CHECK (fg_enable IN (0, 1)),
+    lat         REAL,                                -- WGS-84 latitude (from station_coordinates.csv)
+    lon         REAL,                                -- WGS-84 longitude (from station_coordinates.csv)
     first_seen  TEXT,
     last_seen   TEXT
 ) STRICT;
@@ -435,6 +438,7 @@ Transient network failures during `capture` or `census` trigger exponential back
 
 ### GTFS Mapping Specifications
 - **`agency.txt`**: Kereta Commuter Indonesia (KCI).
+- **`stops.txt`**: Keyed by `stop_id` = `sta_id`; `stop_name` = `sta_name`; `stop_lat` and `stop_lon` populated directly from `data/station_coordinates.csv`. Missing coordinates produce soft warnings during `build` and a validation error on `export`.
 - **`routes.txt`**: Mapped from commercial `ka_name` strings (e.g., Cikarang Line, Bogor Line).
 - **`trips.txt`**: Keyed by `trip_id`; `trip_headsign` maps to `headsign`; routing variations retain explicit pattern signatures.
 - **`stop_times.txt`**: Stop times derived from integer service-day seconds formatted as `HH:MM:SS` (values past 23:59:59 format continuously as `24:XX:XX`, conforming to GTFS standard).
@@ -470,6 +474,7 @@ Transient network failures during `capture` or `census` trigger exponential back
 | **10** | **Timetable Document Model**. | Real-time event stream ingestion. | The API acts as an undated document server; single full-day queries capture the entirety of a repeating operational schedule. |
 | **11** | **Embedded SQLite Engine (STRICT Mode)**. | Centralized PostgreSQL instance. | Minimizes operational overhead, avoids database server maintenance, and aligns with potential edge deployment targets (Cloudflare D1). |
 | **12** | **Region-Scoped Ingestion & Fingerprinting**. | Global monolithic capture across all stations nationwide. | KCI operates two geographically disjoint commuter networks (Jabodetabek/Merak with `group_wil: 0` vs Yogyakarta/Solo with `group_wil: 6`). Regional scoping decouples capture campaigns, isolates edition hash validation (Invariant 11), and allows expanding to Yogyakarta later via a single configuration parameter without invalidating historical snapshots. |
+| **13** | **Supplementary Station Coordinates via Decoupled CSV**. | Relying solely on API attributes or hardcoding coordinates in migrations. | GTFS `stops.txt` strictly mandates `stop_lat` and `stop_lon`, which the upstream REST API does not publish. Maintaining coordinates in a version-controlled `data/station_coordinates.csv` joined on `sta_id` during `build` cleanly decouples manual/external geospatial enrichment from upstream API captures while guaranteeing reproducible offline builds. |
 
 ---
 
