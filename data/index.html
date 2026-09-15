@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Station Coordinate Check</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin: 0; font-family: sans-serif; }
+    #map { height: 100vh; width: 100%; }
+    .station-list {
+      position: absolute; top: 10px; right: 10px; z-index: 1000;
+      background: white; padding: 10px; border-radius: 6px;
+      max-height: 90vh; overflow-y: auto; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    }
+    .station-list a { display: block; padding: 2px 4px; text-decoration: none; color: #333; font-size: 13px; }
+    .station-list a:hover { background: #f0f0f0; }
+    #search {
+      width: 100%; box-sizing: border-box; margin-bottom: 6px; padding: 4px;
+      border: 1px solid #ccc; border-radius: 4px;
+    }
+    #error { color: #b00; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="station-list">
+    <input id="search" type="text" placeholder="Filter stations..." />
+    <div id="error"></div>
+    <div id="list"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/papaparse@5.7.0/papaparse.min.js"></script>
+  <script>
+    const map = L.map("map").setView([-6.2, 106.7], 10);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    function processCsv(csvText) {
+      const rows = Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true
+      }).data;
+
+      const markers = {};
+
+      rows.forEach(r => {
+        const lat = parseFloat(r.lat);
+        const lon = parseFloat(r.lon);
+        if (isNaN(lat) || isNaN(lon)) return; // skip bad rows
+
+        const marker = L.marker([lat, lon]).addTo(map)
+          .bindPopup(`<b>${r.sta_id}</b><br>${r.sta_name}<br>${lat}, ${lon}`);
+        markers[r.sta_id] = { marker, lat, lon };
+      });
+
+      // Fit map to all markers
+      const group = new L.featureGroup(Object.values(markers).map(m => m.marker));
+      map.fitBounds(group.getBounds().pad(0.1));
+
+      // Sidebar list
+      const listEl = document.getElementById("list");
+      const searchEl = document.getElementById("search");
+
+      function renderList(filter = "") {
+        const f = filter.toUpperCase();
+        listEl.innerHTML = "";
+        rows.forEach(r => {
+          if (!markers[r.sta_id]) return;
+          if (r.sta_id.includes(f) || r.sta_name.toUpperCase().includes(f)) {
+            const a = document.createElement("a");
+            a.href = "#";
+            a.textContent = `${r.sta_id} — ${r.sta_name}`;
+            a.onclick = (e) => {
+              e.preventDefault();
+              map.setView([markers[r.sta_id].lat, markers[r.sta_id].lon], 16);
+              markers[r.sta_id].marker.openPopup();
+            };
+            listEl.appendChild(a);
+          }
+        });
+      }
+
+      searchEl.addEventListener("input", () => renderList(searchEl.value));
+      renderList();
+    }
+
+    // ---- Choose ONE of the two loading methods below ----
+
+    // Option A: fetch stations.csv (requires running via a local server)
+    fetch("station_coordinates.csv")
+      .then(res => {
+        if (!res.ok) throw new Error(`Could not load stations.csv (HTTP ${res.status})`);
+        return res.text();
+      })
+      .then(processCsv)
+      .catch(err => {
+        document.getElementById("error").textContent = err.message;
+      });
+
+    // Option B: file picker (works when opening the HTML directly via file://)
+    // Comment out the fetch block above and uncomment this instead:
+    //
+    // const input = document.createElement("input");
+    // input.type = "file";
+    // input.accept = ".csv";
+    // input.onchange = () => {
+    //   const reader = new FileReader();
+    //   reader.onload = () => processCsv(reader.result);
+    //   reader.readAsText(input.files[0]);
+    // };
+    // input.click();
+  </script>
+</body>
+</html>
