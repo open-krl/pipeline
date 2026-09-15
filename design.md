@@ -242,7 +242,7 @@ The API provides exactly one scheduled time per stop:
 |---|---|
 | **Direct API Attributes** | Station master (`sta_id`, `sta_name`, `group_wil`, `fg_enable`); station board departure times; destination name + arrival time; line name (`ka_name`); color code; `route_name`; ordered itinerary stops, times, and transit flags. |
 | **Deterministic Derivations** | `base_train_no`, `revision`, and `F` parsed from `train_id`; origin and destination station names from `route_name`; service-day integer seconds; stop sequence index. |
-| **Supplementary External Data** | Station coordinates (`lat`, `lon`) sourced from version-controlled `data/station_coordinates.csv` and joined on `sta_id`. Statutory holiday schedules (`holidays`). |
+| **Supplementary External Data** | Station coordinates (`lat`, `lon`) sourced from version-controlled `data/station_coordinates.csv` (generated via Overpass extraction script `scripts/fetch-station-coordinates.ts` and joined on `sta_id`). Applies empirical ticketing code overrides (`GRG` $\to$ `GGL`, `PCN` $\to$ `POC`, `TTI` $\to$ `THI`, `TOJ` $\to$ `TOJB`) and missing-tag fallbacks (`BPR`, `JTK`). Filters 5 non-commuter heavy rail nodes (`GMR`, `JAKG`, `CGD`, `BOP`, Bandara Soekarno-Hatta). Statutory holiday schedules (`holidays`). |
 | **Inferred (Requires Cross-Capture Logic)** | Origin/terminus resolved to station foreign keys; service calendar presence masks (via progressive fold over observed captures and holiday cross-reference); fakultatif operational status; candidate transfer edges. |
 | **Unobtainable from Source** | Intermediate arrival times / dwell intervals; historical timetable revisions; real-time delay tracking. |
 
@@ -458,6 +458,9 @@ Execution runs via a local TypeScript/Bun CLI toolchain requiring zero long-runn
 - **`calendar`**: (Optional read-only tool) Pretty-prints the three-way set-difference across day types for human review, outputting empirical schedule identity statistics (verifying static vs. date-aware behavior).
 - **`detect`**: Probes a single reference station board (e.g., Manggarai or Bekasi) and compares the resulting signature with the active database edition to detect unannounced timetable revisions.
 
+### Auxiliary Tooling
+- **`scripts/fetch-station-coordinates.ts`**: Standalone extraction script executed via Bun. Queries the public Overpass API using strict spatial bounding and negative operator/mode filters, resolves OSM tagging inconsistencies, and generates the canonical `data/station_coordinates.csv` file for offline `build` and `export` runs.
+
 ### Phased Runbook (v1.2)
 1. **Day-1 Baseline Bootstrap:** Execute `capture` on a confirmed standard working day (Tuesday, Wednesday, or Thursday). Run `census` for discovered trains, followed immediately by `build` and `export`. A complete, functional SQLite database and provisional weekday GTFS feed are operational on day one.
 2. **Weekend Enrichment (Order-Free, Incremental):** Execute `capture` on the subsequent Saturday and Sunday. Run `census` (which executes in minutes, fetching only newly discovered delta trains).
@@ -521,6 +524,7 @@ Transient network failures during `capture` or `census` trigger exponential back
 | **Operational Flag Exceptions** | Inspected Serang station (`SG`) configuration. | **Verified** ✅ | Serang has `fg_enable=0` despite operating 14 daily departures. Schema must never filter on `fg_enable=1`. |
 | **Line Brand Extraction** | Cross-referenced `ka_name` across corridor payloads. | **Verified** ✅ | Consistently carries clean commercial designations (`"COMMUTER LINE CIKARANG"`). Mapped directly to `trips.line_name`. |
 | **Transit Field Typings** | Inspected itinerary payloads for transfer interchange representations. | **Verified** ✅ | Returns `""` (empty string) when absent, or `string[]` of hex color codes when present. Normalized via Zod at boundary. |
+| **Geospatial Coordinate Coverage** | Cross-referenced OSM railway stations against KCI master (`group_wil: 0`, 94 stations). | **Verified** ✅ | 100% of physical Jabodetabek and Merak stations mapped to WGS-84 coordinates in `data/station_coordinates.csv`. Non-commuter lines (MRT, LRT, Whoosh, freight, regional) and non-stop stations (Gambir) explicitly filtered via `scripts/fetch-station-coordinates.ts`. |
 | **Weekday Uniformity** | Comparative diff between Tuesday and Thursday board captures. | Open | Assumed identical based on operational domain standards; verifiable via multi-day capture comparison. |
 | **Itinerary Census Coverage** | Total network itinerary census probe. | Open | Determines whether the fallback reconstruction path remains an exceptional fallback or a standard path. |
 | **Annual Holiday Rules** | Cross-check national SKB 3 Menteri holiday decrees against captured dates. | Open | Requires annual maintenance of the `holidays` configuration table. |
