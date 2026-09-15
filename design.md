@@ -1,337 +1,521 @@
 # Design & Discovery Document — KRL Schedule Database
 
-*Supersedes v2 entirely. Both of v2's errors shared one root cause: reading a **document server** as a **data stream**. Four supersessions, each evidence-justified:*
-
-1. **§2.4/§3.2/§6.5 (v2) — the schedules endpoint serves a timetable document, not a live day.** Every `time_est` row is a *pattern* fact, not a dated event: rows carry no date, the post-midnight tail sits identically at the top of every day's board, and the full-day window returns the complete repeating pattern. v2's collection consequences — "a complete service day = snapshot D's body + snapshot D+1's head," consecutive-capture requirements — are **retracted**. The dead-band rule survives as **time arithmetic** (stamping clock times into service-day seconds), which is all GTFS ever needed.
-2. **§7.11/§8 (v2) — one-shot operation, not a monitoring station.** Three day-type captures + one itinerary census, run manually, ever. The "periodic canary" becomes an optional manual edition check. No schedule, no daemon, no recurring job.
-3. **§5 (v2) — SQLite target, not PostgreSQL.** Deployment simplicity and a Cloudflare D1 serving path. Type enforcement moves from engine to discipline: STRICT tables, CHECK constraints, FK pragma per connection, canonical UTC timestamps, validation at every boundary.
-4. **§10 (v2) — the static-vs-date-aware test is no longer a pending probe; it *is* the capture plan.** The three captures perform the test and simultaneously constitute the dataset for either outcome.
-
+**Version:** 1.0  
 ---
 
 ## 1. Purpose & Deliverables
 
-Ingest KRL's current timetable edition from a station-centric REST API into a normalized relational database, producing:
+Ingest the current Kereta Commuter Indonesia (KRL) timetable edition from KCI's station-centric REST API into a normalized relational database, producing:
 
-1. **Relational core** — stations, trips, ordered stop-time sequences.
-2. **Service calendar** per trip — the hardest deliverable; strategy branch-gated on the capture diff (§12).
-3. **GTFS-compatible export** — routes, trips, stop_times, calendar, calendar_dates (transfers deferred).
-4. **A raw-response archive** — KRL serves no history; this archive is the only record of this edition that will ever exist. Not a longitudinal record: one edition, three day-type views, unless a future revision prompts a re-run.
-5. **A reconciliation report** against the official PDF timetable — semantic reference, not completeness oracle.
+1. **Relational core** — stations, trips, and ordered stop-time sequences.
+2. **Service calendar** per trip — resolved via empirical set-difference across day-type captures or PDF schedule reconciliation.
+3. **GTFS-compatible export** — `routes`, `trips`, `stop_times`, `calendar`, and `calendar_dates` (transfers deferred).
+4. **Raw-response archive** — a deterministic, versioned snapshot archive of the upstream API responses (the API provides no revision history; our raw archive constitutes the permanent record of this edition).
+5. **Reconciliation report** — cross-validation between API operational data and the official PDF timetable (treated as a semantic reference, not a completeness oracle).
 
-**v1 scope ("done"):** three captures, one census, build, export, report. **Parked:** D1 publish; PDF-scrape calendar extraction (invoked only if the diff says the backend is static); transfer graph.
+### Scope Boundaries
+* **In Scope (v1):** Three day-type captures (weekday, Saturday, Sunday), a single enrichment census, offline validation/build pipeline, GTFS export, and reconciliation report.
+* **Deferred:** Cloudflare D1 serving deployment, automated transfer graph generation (`transfers.txt`), and PDF text-layer schedule extraction (fallback invoked only if API diff indicates a completely static backend).
+
+---
 
 ## 2. Source System: The API
 
-Three endpoints, confirmed from direct inspection of live responses and operator requests:
-- **Base URL:** `https://www.kci.id` (redirected from `commuterline.id` or called directly).
-- **Network Headers:** Cloudflare bot management is bypassed using standard browser headers (`User-Agent: Mozilla/5.0...`, `Accept: application/json, text/plain, */*`, and `Referer: https://www.kci.id/`).
-- **Response Envelope:** Wrapped JSON: `{ status: 200, data: [...] }`, with `message: "Success"` optionally present on station master. Payloads are archived verbatim. Everything below is field-level semantics.
+The upstream system exposes three core HTTP JSON endpoints:
+- **Base URL:** `https://www.kci.id`.
+- **Network Headers:** Standard browser headers bypass gateway bot-management challenges:
+  ```http
+  User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36
+  Accept: application/json, text/plain, */*
+  Referer: https://www.kci.id/
+  ```
+- **Response Envelope:** Standard JSON wrapper: `{ "status": 200, "data": [...] }` (with an optional `"message": "Success"` on station master).
 
-### 2.1 `GET /api/krl/stations` ✅
-Station master. Envelope: `{ status: 200, message: "Success", data: [...] }`. Fields: `sta_id`, `sta_name`, `group_wil`, `fg_enable`.
-- **Ingestion filter:** `sta_id NOT LIKE 'WIL%'`. `WIL*` rows (`WIL0` Jabodetabek, `WIL1` Merak, `WIL6` Yogyakarta) are regional dropdown section headers rendered with `fg_enable=0`, not physical stations.
-- **Critical discovery — do NOT filter on `fg_enable=1`:** Station `SG` ("SERANG") has `fg_enable=0` in the station master despite being a fully operational station (verified: 14 daily departures in `/api/krl/schedules?stationid=SG` and stops on Merak line itineraries). Using `fg_enable=1` as an ingestion gate drops Serang and breaks foreign keys on Merak line trips.
-- **`group_wil` semantics:** `group_wil=6` identifies Yogyakarta–Solo stations (17 stations). However, Merak line stations are coded `group_wil=0` (identical to Jabodetabek). Thus, `group_wil=0` cannot isolate Jabodetabek from Merak.
+```
+                      ┌────────────────────────┐
+                      │   GET /api/krl/stations│
+                      └───────────┬────────────┘
+                                  │ Station Master
+                                  ▼
+           ┌──────────────────────────────────────────────┐
+           │ For each valid sta_id:                       │
+           │ GET /api/krl/schedules?stationid={id}&...    │
+           └──────────────────────┬───────────────────────┘
+                                  │ Station Boards (Full Day Window)
+                                  ▼
+                     [ Discovered Train IDs ]
+                                  │
+                                  ▼
+           ┌──────────────────────────────────────────────┐
+           │ For each unique operational train_id:        │
+           │ GET /api/krl/train-schedule?trainid={id}     │
+           └──────────────────────────────────────────────┘
+                                  │ Complete Itineraries
+                                  ▼
+                    [ Normalized Relational DB ]
+```
 
-### 2.2 `GET /api/krl/schedules?stationid=&timefrom=&timeto=` ✅
-One station's departures board for the requested window (`HH:MM`; `00:00–23:59` returns the full pattern in one call, verified). Envelope: `{ status: 200, data: [...] }`. Fields per row: `train_id`, `ka_name`, `route_name`, `dest`, `time_est`, `color`, `dest_time`.
+### 2.1 `GET /api/krl/stations`
+Station master catalog. Envelope: `{ status: 200, message: "Success", data: [...] }`. Fields: `sta_id`, `sta_name`, `group_wil`, `fg_enable`.
 
-- `time_est` = **departure at the queried station** — formatted as `HH:MM:SS` (seconds strictly `:00` across all board departures).
-- `dest_time` = **arrival at the terminus** — formatted as `HH:MM:SS` (seconds strictly `:00`).
-- `ka_name` = **commercial corridor name** — confirmed (e.g. `"COMMUTER LINE CIKARANG"`, `"COMMUTER LINE BOGOR"`, `"COMMUTER LINE RANGKASBITUNG"`, `"COMMUTERLINE MERAK"`).
-- `dest`, `dest_time`, `route_name`, `color`, `ka_name` are **identical across every station's row for a given train** — denormalized trip-level data; both a validation invariant and the anchor for midnight-wrap detection.
-- **Departure-only boards**: Boards list departures only. A train terminating at station `X` does **not** appear on station `X`'s board as an arrival (`dest == station_name` yields 0 rows across all tested boards). Terminus arrival times are obtained strictly from `dest_time` on upstream departures or from the train itinerary.
-- Board is time-sorted with **exact ties** (BKS: 06:10, 08:03, 09:07, 17:52 each carry two trains) — deterministic tie-breaking (`time_est`, then `train_id`) wherever we sort.
-- Boards are **complete by construction**: a train absent from a station's board does not serve that station. This makes the board fan-out the discovery backbone of the whole system.
+- **Ingestion Filter:** `sta_id NOT LIKE 'WIL%'`. Rows starting with `WIL*` (`WIL0` Jabodetabek, `WIL1` Merak, `WIL6` Yogyakarta) represent regional dropdown section headers with `fg_enable=0`, not physical stations.
+- **Physical Station Ingestion Rule:** Do **not** filter out `fg_enable=0`. Station `SG` ("SERANG") is flagged with `fg_enable=0` in the station master despite being fully operational (14 daily departures and active stops on Merak line itineraries). Restricting ingestion to `fg_enable=1` drops Serang and breaks referential integrity on Merak corridor trips.
+- **Regional Grouping (`group_wil`):** `group_wil=6` isolates Yogyakarta–Solo stations (17 stations). Merak line stations share `group_wil=0` with Jabodetabek, meaning `group_wil=0` cannot be used to isolate Jabodetabek from Merak.
 
-### 2.3 `GET /api/krl/train-schedule?trainid=` ✅
-Full ordered itinerary for one train. Requires the **exact operational ID including suffix** — `5552` → 404, `5552A` → 200 (confirmed, load-bearing). Envelope: `{ status: 200, data: [...] }`. Response: ordered array, origin→terminus, both endpoints inclusive: `station_id`, `station_name`, `time_est`, `transit_station` (bool), `color`, `transit` (`""` when empty, `string[]` of connecting line hex colors when populated, e.g. `["#ff8095", "#0000ff"]`).
+### 2.2 `GET /api/krl/schedules?stationid=&timefrom=&timeto=`
+Station departures board for a requested time window (`HH:MM`). Setting `timefrom=00:00&timeto=23:59` returns the complete repeating timetable pattern for that station in a single request. Envelope: `{ status: 200, data: [...] }`.
 
-- **Sub-minute granularity**: Unlike station boards which round to `:00`, itinerary `time_est` contains **exact seconds / sub-minute precision** (e.g. `15:41:30` at Rajawali for `5552A`).
-- **Array order is authoritative** — the only source of stop sequence.
-- **Coverage unmeasured** (census pending); hypothesis: every board train has an itinerary. A 404-fallback reconstruction path exists regardless, with provenance.
-- `transit` uses a **legacy color palette** unrelated to board colors — display metadata, never a key. Flags identify transfer points → candidate transfers material (deferred).
+Fields per row: `train_id`, `ka_name`, `route_name`, `dest`, `time_est`, `color`, `dest_time`.
 
-### 2.4 Behavioral profile & operating model
+- `time_est`: Scheduled departure time at the queried station, formatted as `HH:MM:SS` (seconds are strictly `:00` across all board departures).
+- `dest_time`: Scheduled arrival time at the terminus, formatted as `HH:MM:SS` (seconds are strictly `:00`).
+- `ka_name`: Commercial corridor branding (e.g., `"COMMUTER LINE CIKARANG"`, `"COMMUTER LINE BOGOR"`, `"COMMUTER LINE RANGKASBITUNG"`, `"COMMUTERLINE MERAK"`).
+- **Trip-Level Consistency:** `dest`, `dest_time`, `route_name`, `color`, and `ka_name` are identical across every station board row for a given `train_id`. These denormalized trip-level values serve as both validation invariants and reference anchors for midnight-wrap detection.
+- **Departure-Only Boards:** Station boards publish departures only. A train terminating at station $X$ does *not* appear on station $X$'s board as an arrival (`dest == sta_name` yields 0 rows across all stations). Terminus arrival times must be sourced from upstream `dest_time` entries or from the train's full itinerary.
+- **Sorting & Ties:** Boards are sorted by departure time with occasional exact ties (e.g., dual departures at Bekasi: 06:10, 08:03, 09:07, 17:52). Deterministic tie-breaking requires sorting by `time_est`, then `train_id`.
+- **Exhaustive Discovery:** Boards are complete by construction: a train absent from a station's board does not call at that station. Aggregating all station boards provides a complete census of all active trips.
 
-- No auth, plain GET/JSON. Base URL: `https://www.kci.id`. Cloudflare bot management is bypassed by sending standard browser headers (`User-Agent` and `Referer: https://www.kci.id/`).
-- **5–10 s latency per call, param-independent** — per-request overhead, not query cost. Consequences: concurrency-limited fan-out; the census is a **one-time, resumable, cache-backed cost** (~1,000–1,500 calls, once per edition, ever).
-- **No date parameter exists in the frontend; no history is served.** The server holds the current edition only.
-- **Operating model (strong prior, from domain knowledge): the API is a timetable document server.** Same schedule every weekday; weekends may differ. The tail rows at board top (00:02–01:04 at BKS) are the *pattern's own tail*, not yesterday's leftovers — under a live-board reading they would need date stamps to be interpretable across captures, and none exist. Confirmation: the three-capture diff (§9). Free optional corroboration: fetch one board twice in one day and diff.
+### 2.3 `GET /api/krl/train-schedule?trainid=`
+Full, ordered itinerary for a specific train. Requires the **exact operational ID including any letter suffixes** (`5552` yields 404; `5552A` yields 200). Envelope: `{ status: 200, data: [...] }`.
 
-## 3. Reverse-Engineered Backend
+Response: Ordered array, origin to terminus, both endpoints inclusive:
+`station_id`, `station_name`, `time_est`, `transit_station` (bool), `color`, `transit` (`""` when empty; array of hex strings `["#ff8095", "#0000ff"]` when populated).
 
-What their system must look like to produce the observed responses. This section exists because inference *predicts* behavior we depend on.
+- **Sub-Minute Granularity:** Unlike station boards that truncate to whole minutes (`:00`), itinerary `time_est` values contain exact seconds (e.g., `15:41:30` at Rajawali for `5552A`).
+- **Stop Sequence:** Array order is authoritative; it is the sole ground truth for physical stop sequence.
+- **Display Metadata:** `transit` utilizes a legacy color palette unrelated to primary corridor colors; flags indicate interchange points for candidate transfer generation.
 
-**Inferred store:**
+### 2.4 Behavioral Profile & Operating Model
 
-| Inferred table | Evidence |
-|---|---|
-| `stations(sta_id, sta_name, group_wil, fg_enable)` | Endpoint 2.1 verbatim; `fg_enable=0` rows render as dropdown separators ⇒ the table doubles as frontend UI config |
-| `trips(train_id PK, ka_name, route_name, dest, dest_time, color)` | Board's trip-level fields identical across every station ⇒ stored once per trip, joined onto each board row; `dest_time` is the terminus arrival held at trip level |
-| `trip_stops(train_id, seq, station_id, time_est, transit flags)` | Itinerary is an ordered, both-endpoints-inclusive array; boards are per-station time-windows over the same stop rows |
+- **No Live Day State:** The API exposes a static timetable document rather than a live-day feed. Rows contain no calendar dates, and the post-midnight departures (00:02–01:04) sit permanently at the head of every daily query.
+- **System Overhead:** Endpoints exhibit an invariant 5–10 second latency per request regardless of parameter windowing, reflecting gateway and proxy overhead rather than backend query execution time.
+- **Concurrency & Fan-Out:** Station-board fan-outs (~85 operational stations) and train-itinerary censuses (~1,000–1,500 trains) must run under controlled concurrency with persistent, resumable raw-file caching.
 
-**Behavioral inferences:**
+---
 
-1. **The full `train_id` (suffix included) is their primary key.** The 404/200 asymmetry on `5552`/`5552A` proves exact-match keying. Corollary: re-lettering (5022C→D) is a row replacement — which predicts 404s can become 200s as the backend updates, and old suffixes may 404 after a revision. *(High confidence.)*
-2. **Two data paths feed the two schedule endpoints.** The itinerary path carries a legacy color palette and a lax serialization (`transit: "" | []`) that the board path doesn't share ⇒ different table or service, older schema. Prediction: itinerary quirks evolve independently of board changes. *(Medium-high.)*
-3. **Latency is gateway overhead** — bot management, cold start, or upstream proxy. Prediction: latency won't shrink with smaller windows; concurrency is the only lever. *(High.)*
-4. **Edition-scoped, replace-in-place content.** No date params, no history ⇒ revisions overwrite. Our archive is the only record of any captured edition. *(High.)*
-5. **Document, not stream** — §2.4's prior; the captures decide. *(Strong prior, pending the diff.)*
+## 3. Reverse-Engineered Upstream Backend
+
+Understanding the upstream data model allows us to predict edge-case behaviors and design resilient schemas:
+
+```
+┌────────────────────────────────────────────────────────┐
+│ Inferred Upstream Architecture                         │
+│                                                        │
+│  stations                                              │
+│  (sta_id, sta_name, group_wil, fg_enable)              │
+│       │                                                │
+│       ├─────────────────────────┐                      │
+│       ▼                         ▼                      │
+│  trips                     trip_stops                  │
+│  (train_id [PK], ka_name,  (train_id [FK], seq,        │
+│   route_name, dest,         station_id [FK], time_est, │
+│   dest_time, color)         transit_flags)             │
+│                                                        │
+└────────────────────────────────────────────────────────┘
+```
+
+### Inferred Tables
+1. **`stations(sta_id, sta_name, group_wil, fg_enable)`**: Mirrors `GET /api/krl/stations`. Because `fg_enable=0` is used for dropdown separators and select stations, this table acts as both operational data and UI rendering configuration.
+2. **`trips(train_id PK, ka_name, route_name, dest, dest_time, color)`**: Denormalized trip attributes return identically across all station board appearances, confirming they are stored once per trip and joined on query.
+3. **`trip_stops(train_id, seq, station_id, time_est, transit flags)`**: Itineraries represent pre-sorted stop lists. Station boards represent view queries over `trip_stops` filtered by station and time window.
+
+### Inferred Architectural Behaviors
+- **Exact Operational Primary Key:** Upstream keys trips by full `train_id` (including operational suffixes). Re-lettering a trip (e.g., `5022C` $\to$ `5022D`) is an in-place replacement or insertion under a new key.
+- **Heterogeneous Systems:** Itinerary serialization (`transit: "" | []`, legacy hex codes) differs substantially from station boards, indicating two distinct backend services or views querying different historical schemas.
+- **Replace-in-Place Timetable Editions:** Revisions overwrite existing records without historical versioning. Archiving the raw responses is the only way to preserve a record of any timetable edition.
+
+---
 
 ## 4. Domain Model
 
-### 4.1 Train identity: the base-number model ⭐
-The central discovery. `train_id` is a two-part identifier whose parts behave differently:
+### 4.1 Train Identity: The Base-Number Model
+Operational train identifiers are composed of a structural base number and operational revision/type markers:
 
-| Train | PDF prints (Feb 2026 ed.) | API runs | Stop mapping |
+```
+                  Operational Identifier: 5022D
+                  ┌─────────────────┬───┐
+                  │      5022       │ D │
+                  └────────┬────────┴─┬─┘
+                           │          │
+           Base Train Number          Operational Suffix
+           (Persistent Identity)      (Schedule Revision)
+```
+
+| Train Base | Published Schedule (PDF) | Observed API Run | Stop Profile |
 |---|---|---|---|
-| 5195 | `5195` | `5195` | identical |
-| 5022 | `5022C` | `5022D` | **identical** |
-| 5552 | `5552` | `5552A` | **identical** |
+| 5195 | `5195` | `5195` | Identical |
+| 5022 | `5022C` | `5022D` | Identical |
+| 5552 | `5552` | `5552A` | Identical |
 
-**Rule: the base number is persistent identity; the suffix letter is mutable state.** Corollaries:
+**Rules of Identity:**
+1. **Base Number as Identity:** The base number represents the persistent identity of the service path. Suffix letters represent operational iterations or timetable revisions and convey no intrinsic schedule difference.
+2. **Fingerprint Verification:** Identity across sources (API vs. PDF or capture-to-capture) cannot rely on suffix matching. Joins require the **fingerprint**:
+   $$\text{Fingerprint} = (\text{base\_train\_no}, \text{terminus\_station}, \text{arrival\_time} \pm \text{tolerance})$$
+3. **Identifier Grammar:** 100% of observed IDs match:
+   $$\verb|^(\d+)([A-E])?(F)?$|$$
+   Extracting `base_train_no`, `revision`, and optional `F` (fakultatif) flag. Any non-conforming identifier must be quarantined immediately.
+4. **Permissible Drift:** API-to-PDF suffix distance must fall within $\{0, +1\}$. Any greater drift or unparseable mutation indicates a renumbered path requiring manual review.
 
-- Suffixes carry **zero reliable schedule signal** — never infer sameness/difference of times from letters; verify with the fingerprint **(terminus station, arrival time ± tolerance)**.
-- Expected letter distance API−PDF ∈ {0, +1}; anything else is a mis-join or renumbering → auto-flag.
-- Grammar (100% of 749 observed unique IDs conform): `^(\d+)([A-E])?(F)?$` → `base_train_no`, `revision`, F-flag (F recoverable from the full ID; the F *column* is a derived observation, §6.6). Unparseable IDs → quarantine, never silent coercion.
-- Cross-source joins use base number **plus fingerprint** — base alone can be reused across editions.
-- Base numbers appear corridor-structured (5xxx/6xxx Cikarang, 16xx Rangkasbitung, 20xx Tangerang) — anomaly heuristic only, unverified.
+### 4.2 The Service Day & Time Arithmetic
+The KRL operational day spans approximately 04:00 to 01:30 the following calendar morning. At Bekasi (BKS), for example, the observed operational dead band spans **01:04 to 04:12**, with the first morning departure at 04:12 and late-night trips departing between 00:02 and 01:04.
 
-### 4.2 The service day — arithmetic, not collection
-- Operational day runs ~04:00 to ~01:30. BKS observed: dead band **01:04–04:12**, first departure 04:12, tail 00:02–01:04 at board top.
-- **Clock times below the dead band belong to the previous service day** — a global rule for converting `HH:MM:SS` to service-day seconds; no per-trip origin knowledge needed. For itineraries, a wrap-detection walk over array order suffices (strict `<`; equal consecutive times are dwell, not wrap).
-- **One full-day capture contains the complete pattern, including its tail.** Physical-day reconstruction (which calendar-date instance a tail row belongs to) is neither possible from this API nor needed for GTFS.
+```
+00:00        01:30                  04:00                                 24:00        25:30
+  ├─── Tail ───┤────── Dead Band ─────├── Morning Peak ── Afternoon ── Night ──┼─── Tail ───┤
+  │ (00:02-01:04)                     │ (04:12...)                             │ (24:02-25:04)
+  └───────────────────────────────────┴────────────────────────────────────────┴────────────┘
+  ▲ Clock Times < 03:30 mapped to Service Day Seconds (> 86,400)               ▲
+```
 
-### 4.3 `route_name` and physical routing
-Grammar: `ORIGIN-TERMINUS[ VIA X]`, concatenated names (`KAMPUNGBANDAN`, `TANAHABANG`). Consequences:
+- **Dead-Band Rule:** Clock departures between 00:00:00 and 03:30:00 belong to the previous calendar day's service pattern.
+- **Service-Day Seconds:** Times are converted to integer seconds elapsed since the start of the service day ($00:00:00 = 0$). Clock times strictly below the dead-band cutoff ($< 12,600\text{ s}$) have $86,400\text{ s}$ added, transforming late-night tail runs into continuous offsets ($> 86,400\text{ s}$ / $> 24:00:00$).
+- **Monotonic Array Walk:** For full itineraries, wrap detection operates via a sequential walk: if stop $i$ has $\text{time\_est} < \text{time\_est}_{i-1}$, it has crossed midnight and increments its day offset. (Identical consecutive times represent scheduled dwell, not a wrap).
 
-- **Origin comes free** — parse the prefix (cross-checked against, no longer derived from, min-time). Needs name normalization to `sta_id` (`TANAHABANG` → `THB`). **Verified:** stripping all whitespace from station names (`sta_name.replace(/\s+/g, '')`) matches 100% of origin/dest tokens across all 41 observed route patterns.
-- `dest` is display text, may include ` VIA X` — strip before station mapping.
-- **`VIA` is load-bearing**: BKS→KPB is 59–63 min unlabeled but 45 min `VIA PSE`; 5552A proves the unlabeled route runs via the City line (Rajawali–Kemayoran–Kramat). Distinct physical paths = distinct GTFS patterns, not cosmetic variants.
+### 4.3 `route_name` Parsing and Physical Routing
+The API publishes route designations using concatenated tokens: `ORIGIN-TERMINUS[ VIA X]` (e.g., `KAMPUNGBANDAN-CIKARANG VIA PSE`).
 
-### 4.4 The loop line (full racket)
-No `train_id` appears twice on the BKS board all day; one-pass trips exist in both directions (5552A: KPB→CKR via City; 5505C: CKR→KPB via MRI). Current timetable models the racket as **stitched one-pass trips**. The `(trip_id, stop_sequence)` key is retained anyway (§6.3): topology permits double-visits, and a structural constraint forbidding them would turn a timetable change into a schema failure.
+- **Origin Station Extraction:** Origin station names can be extracted directly from the route prefix. Whitespace-stripped station matching (`sta_name.replace(/\s+/g, '')`) successfully matches 100% of origin and destination tokens across all observed patterns.
+- **Routing Variants are Load-Bearing:** Route variants (`VIA X`) represent distinct physical paths that must be mapped to distinct GTFS patterns. For example, Bekasi to Kampung Bandan via Manggarai takes 59–63 minutes, whereas the path via Pasar Senen (`VIA PSE`) takes 45 minutes; unlabelled variants take the City Line (Rajawali–Kemayoran–Kramat).
 
-### 4.5 Calendar & markers — the F problem
-- F-suffixed trains are **off Saturdays, Sundays, and national holidays** (PDF legend; e.g. Bogor's 1163F).
-- **F is not universal**: Rangkasbitung sections mark weekday-off trains with red highlighting + a note column — no ID pattern at all. F is **sufficient, not necessary**; service patterns **cannot be derived from ID parsing**.
-- Two strategies, gated on the capture diff: **set-difference across day-type captures** (if the backend is date-aware) or **PDF formatting extraction** (if static — check text-layer machine-readability first).
-- A `holidays` table (annual SKB 3 Menteri) is required either way: "weekdays except national holidays" is not a weekend boolean. Cuti bersama behavior is open.
-- Standing trap: **never infer day-type from snapshot content** — a weekday-holiday board is indistinguishable from a weekend board. Day-type comes from calendar date + holidays table, always.
+```
+   ┌────────────────────── via Pasar Senen (PSE) [45 min] ──────────────────────┐
+   │                                                                            ▼
+[Kampung Bandan]                                                            [Bekasi]
+   │                                                                            ▲
+   └────── via City Line (Rajawali–Kemayoran–Kramat) [59–63 min] ───────────────┘
+```
 
-### 4.6 Time semantics per stop
-One `time_est` per stop: **departure** at origin and intermediates, **arrival** at the terminus. Intermediate arrivals and dwell are unobtainable. GTFS mapping: arrival = departure at intermediates; origin gets departure only; terminus arrival only.
+### 4.4 The Loop Line (Racket Route Topology)
+While current KRL operational practice models the circular loop line as stitched single-pass journeys (e.g., `5552A` runs Kampung Bandan $\to$ Cikarang; `5505C` runs Cikarang $\to$ Kampung Bandan), the database model indexes stops using composite key `(timetable_version, trip_id, stop_sequence)`. This structural choice accommodates double-visit stations on circular patterns without violating relational integrity.
+
+### 4.5 Service Calendar & Operational Markers
+KRL denotes operational exceptions via several mechanisms:
+- **`F` Suffix (Fakultatif):** Indicates services scheduled to run conditionally, routinely suspended on Saturdays, Sundays, and national holidays (e.g., `1163F`).
+- **Unmarked Exceptions:** Specific lines (e.g., Rangkasbitung branch corridors) mark non-weekend runs using tabular formatting rather than identifier suffixes. An `F` suffix is therefore sufficient to indicate non-daily service, but not necessary.
+- **Calendar Determination:** Service calendar coverage (`daily`, `weekday_only`, `weekend_only`) is determined via empirical set-difference across captures (Weekday vs. Saturday vs. Sunday). A reference Indonesian holidays table (`holidays`) accounts for statutory non-operational days. Snapshot day types are assigned strictly by calendar date against national holiday schedules, never inferred from snapshot payload content.
+
+### 4.6 Stop-Time Semantics
+The API provides exactly one scheduled time per stop:
+- **Origin Station:** Represents scheduled **departure**.
+- **Intermediate Stations:** Represents scheduled **departure**. Scheduled arrivals and dwell times are not published.
+- **Terminus Station:** Sourced from `dest_time` or the final itinerary record; represents scheduled **arrival**.
+- **GTFS Translation:** At origin, `arrival_time` is left blank or set equal to `departure_time`. At intermediate stops, `arrival_time` equals `departure_time`. At the terminus, `departure_time` is left blank or set equal to `arrival_time`.
+
+---
 
 ## 5. Information Inventory
 
-| Tier | Information |
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│ DIRECT API ATTRIBUTES                                                  │
+│ Station Master, Departures (time_est), Terminus Name, Terminus Time,   │
+│ Line Name (ka_name), Route String, Hex Color, Stop Itinerary Order     │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ DETERMINISTIC TRANSFORMATIONS                                          │
+│ • Base Train Number & Suffix Parsing                                   │
+│ • Origin/Destination Station ID Extraction                             │
+│ • Dead-Band Service Day Seconds Calculation                            │
+│ • Sequence Ordering (Array Index)                                      │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│ INFERRED / DERIVED VIA CROSS-VALIDATION                                │
+│ • Station Foreign Key Resolution                                       │
+│ • Calendar Allocation (Weekday / Saturday / Sunday Diff)               │
+│ • Fakultatif Observation Status                                        │
+│ • 404-Fallback Itinerary Reconstruction                                │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+| Classification | Attributes |
 |---|---|
-| **Direct** | Station master · departure time at each station · terminus name + arrival time (on every board row) · line name · color · `route_name` · itinerary: ordered stops with station ids, times, transfer flags |
-| **Derived deterministically** | base/revision/F from ID parse · origin/dest station names from `route_name` split (+ normalization) · service-day seconds (dead-band rule) · stop sequence (itinerary array position) |
-| **Inferred, requires cross-validation** | origin/dest as station FKs · wrap classification for 404-fallback trips · service calendar (capture diff or PDF) · fakultatif status (F where present, else set-difference) · transfer graph |
-| **Unobtainable from this API** | Intermediate arrivals/dwell · any historical timetable · calendar info *if the backend is static* · per-date actuals (never existed here) |
+| **Direct API Attributes** | Station master (`sta_id`, `sta_name`, `group_wil`, `fg_enable`); station board departure times; destination name + arrival time; line name (`ka_name`); color code; `route_name`; ordered itinerary stops, times, and transit flags. |
+| **Deterministic Derivations** | `base_train_no`, `revision`, and `F` parsed from `train_id`; origin and destination station names from `route_name`; service-day integer seconds; stop sequence index. |
+| **Inferred (Requires Cross-Validation)** | Origin/terminus resolved to station foreign keys; service calendar patterns (via multi-capture diff or PDF cross-check); fakultatif operational status; candidate transfer edges. |
+| **Unobtainable from Source** | Intermediate arrival times / dwell intervals; historical timetable revisions; real-time delay tracking. |
 
-## 6. Target Schema (SQLite)
+---
 
-Deltas from v2: SQLite dialect (STRICT, TEXT times/dates, INTEGER booleans); new `archive_commit` on `snapshots` (every derived row set linked to its raw evidence — the DB→archive pointer); composite FK `trip_stops → trips`.
+## 6. Relational Database Schema
+
+The database target is SQLite, configured with strict typing, foreign-key enforcement, and write-ahead logging. Timestamps conform strictly to ISO-8601 UTC.
 
 ```sql
-PRAGMA journal_mode = WAL;              -- once, persisted in the file
--- PRAGMA foreign_keys = ON;            -- EVERY connection; application duty (§6.8)
+PRAGMA journal_mode = WAL;
 
 CREATE TABLE stations (
     sta_id      TEXT PRIMARY KEY,
     sta_name    TEXT NOT NULL,
     group_wil   INTEGER NOT NULL,
-    fg_enable   INTEGER NOT NULL CHECK (fg_enable IN (0,1)),
-    first_seen  TEXT,                    -- 'YYYY-MM-DD'
+    fg_enable   INTEGER NOT NULL CHECK (fg_enable IN (0, 1)),
+    first_seen  TEXT,
     last_seen   TEXT
 ) STRICT;
 
--- One row per capture run (= one git commit of raw JSON)
+-- Ingestion batch tracking; links each run directly to its git archive payload
 CREATE TABLE snapshots (
     snapshot_id       INTEGER PRIMARY KEY AUTOINCREMENT,
     snapshot_date     TEXT NOT NULL,
-    day_type          TEXT NOT NULL CHECK (day_type IN ('weekday','saturday','sunday','holiday')),
-    fetched_at        TEXT NOT NULL                      -- canonical UTC instant
-        CHECK (fetched_at = strftime('%Y-%m-%dT%H:%M:%SZ', fetched_at)),
-    status            TEXT NOT NULL CHECK (status IN ('complete','degraded')),
+    day_type          TEXT NOT NULL CHECK (day_type IN ('weekday', 'saturday', 'sunday', 'holiday')),
+    fetched_at        TEXT NOT NULL CHECK (fetched_at = strftime('%Y-%m-%dT%H:%M:%SZ', fetched_at)),
+    status            TEXT NOT NULL CHECK (status IN ('complete', 'degraded')),
     timetable_version INTEGER NOT NULL,
-    archive_commit    TEXT NOT NULL                      -- git commit of this capture's raw payload
+    archive_commit    TEXT NOT NULL
 ) STRICT;
 
 CREATE TABLE trips (
-    timetable_version INTEGER NOT NULL,
-    trip_id           TEXT NOT NULL,     -- FULL string incl. suffix: '5022D', '5552A', '1163F'
-    base_train_no     INTEGER NOT NULL,  -- parsed; cross-source join key
-    revision          TEXT CHECK (revision IS NULL OR length(revision) = 1),
-    line_name         TEXT NOT NULL,     -- confirmed ← ka_name (commercial corridor, e.g. 'COMMUTER LINE CIKARANG')
-    route_name_raw    TEXT NOT NULL,
-    headsign          TEXT NOT NULL,     -- raw dest text (may contain ' VIA X')
-    origin_station_id TEXT REFERENCES stations(sta_id),
-    dest_station_id   TEXT REFERENCES stations(sta_id),
-    origin_time       TEXT NOT NULL,     -- display 'HH:MM:SS'
-    dest_time         TEXT NOT NULL,     -- display 'HH:MM:SS'
-    origin_secs       INTEGER NOT NULL,  -- service-day seconds; all arithmetic lives here
-    dest_secs         INTEGER NOT NULL,
-    total_stops       INTEGER NOT NULL,  -- stop EVENTS, not distinct stations
-    color             TEXT NOT NULL,     -- display metadata only
-    is_fakultatif     INTEGER CHECK (is_fakultatif IN (0,1)),   -- DERIVED observation; NULL = undetermined
-    service_pattern   TEXT CHECK (service_pattern IS NULL
-                                  OR service_pattern IN ('daily','weekday_only','weekend_only')),
-    source            TEXT NOT NULL CHECK (source IN ('itinerary','reconstructed')),
-    itinerary_status  TEXT NOT NULL CHECK (itinerary_status IN ('200','404','unprobed')),
+    timetable_version   INTEGER NOT NULL,
+    trip_id             TEXT NOT NULL,     -- Full operational ID: '5022D', '5552A', '1163F'
+    base_train_no       INTEGER NOT NULL,  -- Parsed base integer; indexed cross-source join key
+    revision            TEXT CHECK (revision IS NULL OR length(revision) = 1),
+    line_name           TEXT NOT NULL,     -- Sourced from ka_name
+    route_name_raw      TEXT NOT NULL,
+    headsign            TEXT NOT NULL,     -- Destination display string
+    origin_station_id   TEXT REFERENCES stations(sta_id),
+    dest_station_id     TEXT REFERENCES stations(sta_id),
+    origin_time         TEXT NOT NULL,     -- Display 'HH:MM:SS'
+    dest_time           TEXT NOT NULL,     -- Display 'HH:MM:SS'
+    origin_secs         INTEGER NOT NULL,  -- Service-day seconds (supports >86400)
+    dest_secs           INTEGER NOT NULL,
+    total_stops         INTEGER NOT NULL,  -- Total stop events
+    color               TEXT NOT NULL,     -- Line color hex
+    is_fakultatif       INTEGER CHECK (is_fakultatif IN (0, 1)),
+    service_pattern     TEXT CHECK (service_pattern IS NULL OR service_pattern IN ('daily', 'weekday_only', 'weekend_only')),
+    source              TEXT NOT NULL CHECK (source IN ('itinerary', 'reconstructed')),
+    itinerary_status    TEXT NOT NULL CHECK (itinerary_status IN ('200', '404', 'unprobed')),
     first_seen_snapshot INTEGER REFERENCES snapshots(snapshot_id),
     last_seen_snapshot  INTEGER REFERENCES snapshots(snapshot_id),
     PRIMARY KEY (timetable_version, trip_id)
 ) STRICT;
-CREATE INDEX idx_trips_base ON trips (base_train_no);     -- deliberately NON-unique (§6.2)
+
+CREATE INDEX idx_trips_base ON trips (base_train_no);
 
 CREATE TABLE trip_stops (
     timetable_version INTEGER NOT NULL,
     trip_id           TEXT NOT NULL,
-    stop_sequence     INTEGER NOT NULL,   -- 1 = origin; itinerary array order (authoritative)
+    stop_sequence     INTEGER NOT NULL,   -- 1 = Origin; strictly ordered by itinerary array index
     station_id        TEXT NOT NULL REFERENCES stations(sta_id),
-    time_raw          TEXT NOT NULL,      -- display
-    arrival_secs      INTEGER,            -- NULL at origin (departure-only semantics)
-    departure_secs    INTEGER,            -- NULL at terminus
-    is_transit        INTEGER CHECK (is_transit IN (0,1)),
+    time_raw          TEXT NOT NULL,      -- Display string 'HH:MM:SS'
+    arrival_secs      INTEGER,            -- NULL at origin stop
+    departure_secs    INTEGER,            -- NULL at terminus stop
+    is_transit        INTEGER CHECK (is_transit IN (0, 1)),
     PRIMARY KEY (timetable_version, trip_id, stop_sequence),
     FOREIGN KEY (timetable_version, trip_id) REFERENCES trips (timetable_version, trip_id)
 ) STRICT;
 
 CREATE TABLE holidays (
-    holiday_date       TEXT PRIMARY KEY,
-    name               TEXT NOT NULL,
-    is_collective_leave INTEGER NOT NULL DEFAULT 0        -- cuti bersama; behavior open
+    holiday_date        TEXT PRIMARY KEY,
+    name                TEXT NOT NULL,
+    is_collective_leave INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 
--- Staging for PDF reconciliation (loaded separately, joined after both sources are in)
+-- Staging table for reconciliation against published PDF schedules
 CREATE TABLE pdf_trains (
-    label TEXT, base_train_no INTEGER, terminus TEXT, arr_time TEXT,
-    stops_json TEXT,                                       -- JSON as text, validated on read
-    line TEXT,
-    reconcile_status TEXT   -- 'exact'|'suffix_shift'|'renumbered'|'api_only'|'pdf_only'
+    label            TEXT,
+    base_train_no    INTEGER,
+    terminus         TEXT,
+    arr_time         TEXT,
+    stops_json       TEXT,
+    line             TEXT,
+    reconcile_status TEXT CHECK (reconcile_status IN ('exact', 'suffix_shift', 'renumbered', 'api_only', 'pdf_only'))
 ) STRICT;
 ```
 
-**Design rationale** (condensed from v2, all still load-bearing):
-
-1. **Full-string `trip_id` PK** — the itinerary endpoint keys on it; suffix mutation creates a distinct row, so revision history falls out for free. Base number carries cross-source identity.
-2. **`base_train_no` indexed, never unique** — a duplicate base within a capture is *evidence for the day-type-variant hypothesis*, not corruption. A unique constraint would convert an open question into an insert error.
-3. **`(trip_id, stop_sequence)`** — time cannot order stops (exact ties; wrap inverts naive sorts); array position is authoritative information; loop topology permits double-visits; GTFS requires it; adjacency queries become trivial; it enables the monotonicity invariant.
-4. **INT seconds alongside TEXT display** — service-day times exceed 24:00 (23:30 origin → 25:15 terminus); all arithmetic uses seconds.
-5. **Snapshot + version dimensions** — day-type variation, station drift, and withdrawal are only observable across captures; `day_type` from calendar + holidays, never content.
-6. **Nullable observations** — `is_fakultatif`/`service_pattern` stay NULL until measured. Every nullable column corresponds to a real open question.
-7. **Provenance columns** — `source`/`itinerary_status` make the 404-fallback path first-class and re-probeable (a 404 may become a 200 after a backend update — §3, inference 1).
-8. **SQLite discipline** — STRICT tables (reject wrong-type values); CHECKs including the canonical-UTC round-trip on `fetched_at`; FK pragma on every connection (without it SQLite enforces nothing); one transaction per capture load (poisoned-capture all-or-nothing, §7.10); INTEGER 0/1 booleans; TEXT times. The engine no longer guards types — this discipline is what replaces it.
-
-## 7. Validation Invariants
-
-Run at build time, every capture — the safety net that makes silent corruption impossible:
-
-1. **Per-trip field consistency** — `route_name`/`dest`/`dest_time`/`color` identical across all board rows of a train.
-2. **≥2 boards per train** — a train serves at least origin + terminus; a single-board appearance means a failed fetch or glitch.
-3. **Dead-band assertion** — no departures anywhere in ~[01:30, 03:30].
-4. **Board↔itinerary time match** — each board `time_est` equals the corresponding itinerary row (duplicate stations matched by order).
-5. **Terminus check** — itinerary's last time == `dest_time`.
-6. **Monotonicity** — adjusted times non-decreasing along `stop_sequence`; violations indicate ID reuse or assembly error.
-7. **Grammar census** — 100% of IDs match the regex, per capture; violations quarantined.
-8. **Letter-distance rule** — API vs. PDF suffix distance ∈ {0, +1}; else flag.
-9. **FK existence** — inferred origin/dest must exist in the *filtered* stations table.
-10. **Failed board = poisoned capture** — no partial acceptance; a failed station corrupts every trip through it.
-11. **Edition consistency** — all captures feeding one build share an edition fingerprint; a cross-capture hash mismatch means a KRL revision landed mid-campaign ⇒ flag and re-capture, never merge silently. (Replaces v2's periodic canary; the manual `detect` command is its post-v1 form.)
-
-## 8. Source-of-Truth Architecture: Raw-First, Git-Versioned
-
-Raw JSON is persisted — deterministically serialized (object keys sorted; **array order preserved**, because itinerary order *is* data) — and committed per capture. The database is a **derived view**, rebuildable from the archive at any time. The **same canonicalization** feeds archive writes and edition fingerprinting; two serializers would manufacture phantom revisions out of formatting noise.
-
-Rationale: the server retains no history — **our archive is the only archive**; a parsing bug costs a re-parse, never a re-fetch (critical with a 5–10 s API and no backfill); change detection happens at the source level, before any parser can normalize a difference away; every conclusion in this document stays reproducible from committed evidence. In the one-shot model, raw-first's payoff concentrates in development: `build` iterates dozens of times against the archive at zero API cost, and the archive doubles as the regression corpus.
-
-**Deliberately not done:** deduping itineraries by stop-pattern (skip-stop variation would fail silently); colors as keys; probing suffix permutations in the census (board IDs verbatim); inferring day-type from content; PDF scraping before the branch is confirmed.
-
-## 9. Operational Model
-
-A CLI, run by hand. Total API exposure for v1: **three ~3-minute captures + one ~40-minute census — under an hour, once, ever.**
-
-**Commands:**
-
-- **`capture`** — compute `day_type` from calendar + holidays table, **require explicit confirmation** (the §4.5 trap, enforced at the only point it can be), fetch station master (if changed) + full board fan-out (~85 stations ÷ concurrency 5 × ~8 s ≈ 3 min), archive, git-commit, insert snapshot row. Accidental double-capture is harmless (upsert, date-keyed).
-- **`census`** — itinerary fan-out for every train_id not yet cached; resumable (the cache is raw files, keyed by train_id + edition); ~35–40 min once.
-- **`build`** — offline over the archive: invariants, load (single transaction), trip construction, 404-fallback with provenance. Rerunnable freely, zero API cost.
-- **`export`** — GTFS + reconciliation report.
-- **`detect`** *(optional, months later)* — board re-fetch, fingerprint diff against the stored edition. On change: the diff identifies exactly which train_ids moved ⇒ re-`capture` ⇒ incremental re-census (cache makes this cheap).
-
-**Runbook (v1):**
-
-1. **Weekday capture** (holiday-guarded). Day-1 inspections ride along, all free from this one capture: WIL/`group_wil` check, time-granularity check (seconds in `time_est`?), KPB duplicate-ID check, CKR terminus-board check; optional same-day board re-fetch diff (static corroboration).
-2. **Within ~one week: Saturday capture, Sunday capture.** (A timetable revision between captures would masquerade as a day-type difference — the one-week window plus invariant 11 guard this.)
-3. **Diff the three captures** → static vs. date-aware resolved → calendar branch chosen; weekend train sets become data if they differ.
-4. **Census once.**
-5. **Build, export, reconcile.**
-
-**Failure policy:** in-run retry with backoff (a 40-minute fan-out *will* see transient failures); persistent failures printed as a station/train list; re-run `capture` — any day if static is confirmed, same day-type if date-aware; degraded captures are archived but never loaded.
-
-**GTFS mapping (provisional defaults, finalize at export):** `route` = line (Cikarang / Bogor / Rangkasbitung / Tangerang …); `direction_id` canonicalized per line by terminus; `headsign` = `dest` (VIA kept); VIA variants as distinct trip-level patterns; `transfers.txt` deferred (routing engines handle same-stop transfers natively; `is_transit` retained in the DB); calendar provisional all-daily in v1 export, measured patterns once §4.5 resolves; `feed_version` = `timetable_version`; validity `end_date` is a fixed decision made at export time (one-shot feed, no rolling window).
-
-## 10. Implementation Posture
-
-TypeScript on Bun (native TS execution; static typecheck remains a separate CI gate — Bun strips types without checking them). SQLite accessed through a typed query layer (Drizzle) whose migrations are plain SQL artifacts in git — schema defined once, enforcement living in the DDL per §6.8. Runtime validation (zod) at every boundary: HTTP responses, config, archived-file reads; interior code consumes inferred types only. Generic mechanics — HTTP with retry/timeout, rate-limited concurrency, deterministic serialization, CSV writing — are library-owned, never hand-rolled. Hand-written code is confined to a **pure domain core** (dead-band arithmetic, wrap walk, fingerprints, tie-breaks, invariants) over primitives, under property-based tests, with the raw archive as regression corpus. No scheduler, no daemon, no service.
-
-## 11. Decision Log
-
-| # | Decision | Rejected alternative | Reason |
-|---|---|---|---|
-| 1 | Hybrid: board fan-out = discovery backbone; itineraries = enrichment; 404-fallback with provenance | Boards-only; itineraries-only | Boards complete by construction; itineraries authoritative where present |
-| 2 | Full-string `trip_id` PK | Normalizing suffix away | Endpoint keying; revision history free (552/5552A proved it) |
-| 3 | `base_train_no` non-unique index | Unique key | Duplicate base = live hypothesis, must be representable |
-| 4 | `(trip_id, stop_sequence)` key | `(trip_id, station_id)` | Ties, wrap, loop topology, GTFS, adjacency |
-| 5 | INT service-day seconds + TEXT display | TIME-only | >24:00 values; arithmetic |
-| 6 | Snapshot + version dimensions | Single-day schema | Day-type variation, drift, withdrawal only observable across captures |
-| 7 | `service_pattern` nullable; `is_fakultatif` observed | `runs_on_weekends` from F-parse | F sufficient-not-necessary; holidays inexpressible |
-| 8 | Calendar via set-difference *or* PDF extraction, branch-gated | ID parsing (falsified) | §4.5; diff decides |
-| 9 | PDF = semantic reference + fingerprint oracle | PDF = completeness oracle | Edition vintage drift proven (5022C→D) |
-| 10 | Fingerprint = (terminus, arrival ± tolerance) + base | Number matching alone | Renumbering and suffix mutation both break number-only joins |
-| 11 | Raw-first git archive, DB derived | DB as sole store | No server history; re-parse ≠ re-fetch; source-level diffing |
-| 12 | Census cached by edition; resumable | Nightly refetch; uncached | 5–10 s latency; cache = crash-resume + edition reuse |
-| 13 | Loop-capable schema despite stitched-racket evidence | Enforce one-visit-per-trip | Defense-in-depth; timetable changes must not become schema failures |
-| 14 | Colors (both palettes) = display metadata | Color as key | Two palettes; variant colors; rebrand risk |
-| 15 | **Document-server model: one capture = complete pattern** | Consecutive-day head/tail stitching collection | Rows undated; tail identical at every board top; time semantics ≠ collection semantics |
-| 16 | **One-shot ops: 3 captures + 1 census, manual CLI** | Scheduled recurring capture | No recurring data need; archive is an edition record, not a longitudinal one |
-| 17 | **SQLite + enforcement discipline (§6.8)** | PostgreSQL | Ops simplicity; D1 path; STRICT/CHECK/pragma recover type safety |
-| 18 | **Libraries own mechanics; pure property-tested core owns domain** | Hand-rolled infra | Fragility lives in custom mechanics, not in domain logic |
-
-## 12. Open Questions & Tests
-
-| Question | Test / Finding | Consequence / Resolution | Status |
-|---|---|---|---|
-| **Static vs. date-aware backend** | The three-capture diff (+ optional same-day double-fetch) | Calendar strategy branch | Open |
-| Weekday homogeneity (Thu == Fri) | Assumed (domain knowledge); PDF reconciliation cross-checks; a 2nd weekday capture is a cheap optional falsifier | Universe completeness | Open |
-| Itinerary coverage rate | The census | Whether fallback path is exercised or insurance | Open |
-| F + revision co-occurrence (`1614AF`?) | PDF inspection (or full capture census) | Grammar totality | Open |
-| Racket = stitched trips? | KPB duplicate-ID check (day-1, free) | Loop representation (defense stands either way) | Open |
-| **Terminus station's own board rows** | Checked Tanah Abang, Manggarai, Bekasi boards: 0 arriving rows (`dest == station_name`). | Boards are **departure-only**. Terminus arrivals synthesized via upstream `dest_time` or itinerary. | **Resolved** ✅ |
-| Cuti bersama behavior | PDF wording / opportunistic | Calendar exception handling | Open |
-| Weekend-only trains exist? | Sat/Sun captures — the data itself | Universe + calendar | Open |
-| **Time granularity** | Board departures strictly `HH:MM:00`. Itineraries have sub-minute / exact seconds (e.g. `15:41:30`). | Store as `HH:MM:SS` and integer service-day seconds. Zero window-edge loss. | **Resolved** ✅ |
-| **`WIL%` / `group_wil ≠ 0`** | `WIL%` are dropdown headers with `fg_enable=0`. `group_wil=6` is Yogyakarta, `0` is Jabodetabek + Merak. **Trap:** Serang (`SG`) has `fg_enable=0` despite running 14 daily trains. | Ingestion filter must be `sta_id NOT LIKE 'WIL%'`. Do NOT gate on `fg_enable=1`. | **Resolved** ✅ |
-| **`line_name` ← `ka_name`?** | `ka_name` verified across all boards and itineraries (e.g. `"COMMUTER LINE CIKARANG"`, `"COMMUTERLINE MERAK"`). | `line_name` sourced directly from `ka_name`. GTFS route mapping confirmed. | **Resolved** ✅ |
-| **`transit` field schema** | Itinerary inspection: `""` when empty; `string[]` of connecting line hex colors when populated (e.g. `["#ff8095", "#0000ff"]`). | Zod schema normalized to `string[]` at boundary. | **Resolved** ✅ |
-| Holiday coverage per year | Manual SKB maintenance; loader hard-warns on uncovered years | `day_type` correctness | Open |
-
-## 13. Why This Architecture
-
-- **Complete by construction** (boards are exhaustive) and **authoritative where possible** (itinerary order, IDs, terminus rows) — the two sources cover each other's weaknesses, with provenance tracking the seam.
-- **Self-validating**: eleven invariants make assembly errors announce themselves instead of silently corrupting the calendar — the failure mode that would matter most in a GTFS export.
-- **Calendar-independent of KRL's marker conventions**: F, red ink, or nothing — the pattern is observed or extracted, never parsed from IDs.
-- **Edition- and history-aware** within its scope: drift, withdrawals, and re-letterings are first-class data for every edition we capture.
-- **Operationally tiny**: under an hour of total API exposure, ever; no service to keep alive; failure is a red terminal, not a silent outage.
-- **Rebuildable**: the raw archive is the store; the database is a view. Every analytical claim reduces to committed evidence.
-
-In a nutshell, capture it three times to read its day-types, census it once to enrich it, archive everything because it keeps no history — and stop.
+### Schema Rationale
+1. **Full `trip_id` Primary Key:** The itinerary endpoint requires the exact alphanumeric identifier. Storing the full operational string ensures lossless joins against source payloads while maintaining revision records naturally across updates.
+2. **Non-Unique `base_train_no` Index:** Multiple trips may legitimately share a base number (e.g., opposing weekend configurations, re-letterings, or split patterns). A non-unique index preserves structural identity without risking load-time primary key collisions.
+3. **Composite `(trip_id, stop_sequence)`:** Time cannot serve as a primary ordering key due to exact ties, station dwells, and midnight crossings. Array sequence index is unambiguous, preserves circular routing topology, and maps directly to GTFS specifications.
+4. **Integer Seconds Alongside Text Strings:** Text columns retain authentic timetable display times (`HH:MM:SS`). Integer seconds normalize times relative to the operational start-of-day, allowing simple arithmetic across midnight ($t \ge 86,400\text{ s}$).
+5. **Traceability via `archive_commit`:** Every snapshot links directly to the git commit hash containing the canonical raw response payloads.
 
 ---
 
-**Review pointers** — the three places I introduced something new rather than transcribing, so you can veto: **(1)** `line_name ← ka_name` is confirmed by live payload inspection (§2.2, §2.3, §12); **(2)** the "weekday homogeneity" row in §12 makes your "same every weekday" prior an explicit, falsifiable assumption rather than silent truth; **(3)** schema deltas beyond the dialect swap: `snapshots.archive_commit` and the composite FK on `trip_stops` — both additions, both cheap, say the word if you don't want them.
+## 7. Validation Invariants
+
+The ingestion engine executes eleven assertions during the build process. Any invariant violation halts compilation and flags the capture:
+
+1. **Intra-Trip Attribute Consistency:** Across all station boards where a `train_id` appears, `route_name`, `dest`, `dest_time`, and `color` must be byte-for-byte identical.
+2. **Minimum Board Occurrence ($\ge 2$):** A valid operational trip must appear on at least two distinct station departure boards (origin and at least one upstream station; terminus has no departure entry). A single-station appearance signals a dropped upstream connection or API truncation.
+3. **Dead-Band Assertion:** Zero scheduled departures may exist network-wide between 01:30:00 and 03:30:00.
+4. **Board-Itinerary Time Congruence:** For every station board row, `time_est` must match the corresponding itinerary stop entry for that train.
+5. **Terminus Alignment:** The final scheduled stop in a train's itinerary must match the trip-level `dest_time` and `dest` station.
+6. **Strict Monotonicity:** Stop sequences must exhibit strictly non-decreasing service-day seconds:
+   $$\text{secs}_i \le \text{secs}_{i+1}$$
+   Consecutive equal times are permitted (dwell); negative deltas trigger immediate invariant failure.
+7. **Identifier Grammar Adherence:** 100% of discovered `train_id`s must conform to the regex `^(\d+)([A-E])?(F)?$`. Violations are isolated to quarantine tables.
+8. **Suffix Distance Bounds:** When reconciling against the published PDF timetable, the suffix distance $(\text{API} - \text{PDF})$ must equal $0$ or $+1$. Greater variance flags potential route restructuring.
+9. **Referential Integrity on Inferred Stations:** All station identifiers extracted from `route_name` or itinerary entries must resolve against valid, non-header rows in the `stations` table (`sta_id NOT LIKE 'WIL%'`).
+10. **Atomic Capture Integrity:** If any station board query experiences an unrecoverable failure or network timeout during a capture run, the entire capture is marked `degraded` and rejected for build purposes.
+11. **Cross-Capture Edition Consistency:** All captures feeding an export must share an identical timetable edition hash. If an upstream timetable change occurs mid-campaign, the run must be aborted and restarted.
+
+---
+
+## 8. Source-of-Truth Architecture: Raw-First, Git-Versioned
+
+Because KCI does not serve historical timetable data, **our repository is the permanent archive**. The local database is an ephemeral, fully reproducible materialized view over raw payload artifacts.
+
+```
+┌────────────────────────────────────────────────────────┐
+│ API Extraction Engine                                  │
+└───────────┬────────────────────────────────┬───────────┘
+            │                                │
+            ▼                                ▼
+┌────────────────────────┐      ┌────────────────────────┐
+│ Station Boards Payloads│      │ Train Itinerary Arrays │
+└───────────┬────────────┘      └────────────┬───────────┘
+            │                                │
+            ▼                                ▼
+┌────────────────────────────────────────────────────────┐
+│ Deterministic Serializer                               │
+│ • Keys sorted alphabetically                           │
+│ • Array order strictly preserved                       │
+│ • Git Commit (archive_commit hash generated)           │
+└───────────────────────────┬────────────────────────────┘
+                            │
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│ Build Engine & Invariant Validator                     │
+│ Generates SQLite database + GTFS Feed completely       │
+│ offline from committed disk files                      │
+└────────────────────────────────────────────────────────┘
+```
+
+- **Deterministic Payload Serialization:** Responses are serialized with sorted object keys while strictly maintaining array ordering (since itinerary stop sequence is semantic data).
+- **Offline Reproducibility:** The `build` step operates exclusively against committed raw files on disk. Compilation, validation, schema migrations, and GTFS exports can be rerun arbitrarily without touching the upstream network.
+
+---
+
+## 9. Operational Model
+
+Execution runs via a local TypeScript/Bun CLI toolchain requiring zero long-running background daemons.
+
+```
+       ┌───────────┐
+       │  capture  │ x 3 runs (Weekday, Saturday, Sunday)
+       └─────┬─────┘
+             │
+             ▼
+       ┌───────────┐
+       │  census   │ x 1 run (Fetch itineraries for all unique IDs)
+       └─────┬─────┘
+             │
+             ▼
+       ┌───────────┐
+       │   build   │ Run offline (Invariants, DB loading, fallback)
+       └─────┬─────┘
+             │
+             ▼
+       ┌───────────┐
+       │  export   │ Generate GTFS feed and PDF reconciliation report
+       └─────┬─────┘
+             │
+             ▼
+       ┌───────────┐
+       │  detect   │ (Optional) Diff single board months later for drift
+       └───────────┘
+```
+
+### CLI Command Reference
+- **`capture`**: Evaluates the current date against the `holidays` table, displays the calculated `day_type`, prompts for user confirmation, queries the station master, and fans out across all station departure boards (~85 stations, concurrency 5, ~3 minutes total). Commits raw payloads to git.
+- **`census`**: Reads all discovered `train_id` values across existing snapshot captures, checks the local payload cache, and issues requests for missing itineraries (~1,000–1,500 calls, concurrency 4, ~35–40 minutes). Resumable at any point.
+- **`build`**: Executes database migrations, evaluates all 11 validation invariants, reconciles 404 itineraries via topological reconstruction, and populates the SQLite tables inside a single atomic transaction.
+- **`export`**: Compiles GTFS specification CSV files (`agency`, `stops`, `routes`, `trips`, `stop_times`, `calendar`, `calendar_dates`) and produces the markdown PDF reconciliation report.
+- **`detect`**: Probes a single reference station board (e.g., Manggarai or Bekasi) and compares the resulting signature with the active database edition to detect unannounced timetable revisions.
+
+### Phased Runbook
+1. **Weekday Capture:** Execute `capture` on a confirmed standard working day (Tuesday, Wednesday, or Thursday). Verify baseline parameters (Serang operational status, time precision, dead-band boundaries).
+2. **Weekend Captures:** Execute `capture` on the subsequent Saturday and Sunday.
+3. **Capture Differentiation:** Execute three-way set-difference to categorize `daily`, `weekday_only`, and `weekend_only` runs.
+4. **Enrichment Census:** Run `census` once to resolve complete itineraries for all unique discovered trains.
+5. **Build & Export:** Execute `build` to generate the normalized SQLite database, followed by `export` to produce production GTFS feeds.
+
+### Failure Policy
+Transient network failures during `capture` or `census` trigger exponential backoff retry. Unrecoverable failures mark the affected capture run as `degraded`. Degraded captures are retained in the raw archive for diagnostic purposes but are strictly barred from the `build` process.
+
+### GTFS Mapping Specifications
+- **`agency.txt`**: Kereta Commuter Indonesia (KCI).
+- **`routes.txt`**: Mapped from commercial `ka_name` strings (e.g., Cikarang Line, Bogor Line).
+- **`trips.txt`**: Keyed by `trip_id`; `trip_headsign` maps to `headsign`; routing variations retain explicit pattern signatures.
+- **`stop_times.txt`**: Stop times derived from integer service-day seconds formatted as `HH:MM:SS` (values past 23:59:59 format continuously as `24:XX:XX`, conforming to GTFS standard).
+- **`calendar.txt` / `calendar_dates.txt`**: Service intervals populated via multi-capture diffing and cross-referenced with statutory holidays.
+
+---
+
+## 10. Implementation Posture
+
+- **Runtime & Toolchain:** TypeScript running on the Bun runtime for performant native execution.
+- **Data Layer:** SQLite operated via Drizzle ORM. DDL migrations are version-controlled SQL files enforcing table-level invariants (`STRICT`, `CHECK`, foreign-key cascade constraints).
+- **Boundary Validation:** Zod schemas validate all input at network and file-system boundaries:
+  - Network JSON payloads.
+  - Archive reads.
+  - Runtime configuration objects.
+- **Domain Core:** Pure, side-effect-free functions govern domain logic (time arithmetic, array monotonicity walks, string normalization, and invariant assertions). Core logic is verified using property-based testing.
+
+---
+
+## 11. Architectural Decision Records (ADRs)
+
+| # | Architecture Decision | Alternative Evaluated | Justification |
+|---|---|---|---|
+| **1** | **Hybrid Ingestion Pipeline** (Station boards for discovery, itineraries for sequence enrichment). | Board-only ingestion; itinerary-only scraping. | Station boards guarantee completeness across the network; itineraries provide millisecond-precision stop sequences and terminus ground truth. |
+| **2** | **Full String `trip_id` Keying** (Preserve raw IDs like `5022D`). | Stripping suffix letters to store integer base keys. | Upstream endpoints query exact alphanumeric strings. Preserving suffixes exposes revision states naturally without losing raw traceability. |
+| **3** | **Non-Unique Index on `base_train_no`**. | Unique constraint on base numbers. | Weekend and holiday timetable variations may run over identical base numbers. Enforcing uniqueness would reject valid operational schedules. |
+| **4** | **Composite Ordering Key `(trip_id, stop_sequence)`**. | Keying by `(trip_id, station_id)` or `(trip_id, departure_time)`. | Accommodates loop configurations, handles dual-departure ties, and maps cleanly to GTFS sequence requirements. |
+| **5** | **Dual Time Representations** (Text display string alongside Integer Service-Day Seconds). | Storing native SQL `TIME` or single epoch timestamps. | Eliminates date parsing complexities and provides clean arithmetic for trips running past midnight ($> 24:00:00$). |
+| **6** | **Explicit Snapshot & Version Metadata**. | Flat single-state database tables. | Timetable variations, station additions, and train cancellations can only be tracked across distinct versioned snapshots. |
+| **7** | **Empirical Calendar Resolution via Capture Diffing**. | Inferring weekend status purely by parsing `F` suffixes. | Empirical evidence proves `F` is sufficient but not necessary; some branches (e.g., Rangkasbitung) mark exceptions via layout formatting rather than ID naming. |
+| **8** | **Raw-First Archival Storage** (Git-committed JSON payloads). | Direct-to-database ingestion with ephemeral HTTP drops. | Upstream maintains no public historical record. Archiving raw responses ensures total reproducibility and eliminates network costs during development. |
+| **9** | **Resumable Local Census Caching**. | Re-scraping itineraries on every run. | High upstream request latencies (5–10 s) make full re-scraping prohibitive; file caches allow progressive, interruptible enrichment. |
+| **10** | **Timetable Document Model**. | Real-time event stream ingestion. | The API acts as an undated document server; single full-day queries capture the entirety of a repeating operational schedule. |
+| **11** | **Embedded SQLite Engine (STRICT Mode)**. | Centralized PostgreSQL instance. | Minimizes operational overhead, avoids database server maintenance, and aligns with potential edge deployment targets (Cloudflare D1). |
+
+---
+
+## 12. Verification Matrix & Open Tests
+
+| Verification Area | Empirical Test | Status | Architectural Resolution |
+|---|---|:---:|---|
+| **Backend Static vs. Date-Aware State** | Three-way diff between Weekday, Saturday, and Sunday captures. | In Progress | Determines whether GTFS calendars are derived purely from capture differences or require supplementary PDF parsing. |
+| **Terminus Board Rows** | Queried major hub boards (Tanah Abang, Manggarai, Bekasi) using `dest == sta_name`. | **Verified** ✅ | Yields 0 records. Station boards are confirmed departure-only. Terminus arrivals are derived from `dest_time`. |
+| **Time Granularity** | Compared board payload times against train-schedule itinerary times. | **Verified** ✅ | Station boards round departures to `:00`. Itineraries expose exact sub-minute seconds (e.g., `15:41:30`). Both stored. |
+| **Station Dropdown Headers** | Verified structural headers starting with `WIL%` in station master. | **Verified** ✅ | Rows are UI section headers with `fg_enable=0`. Filtered via `sta_id NOT LIKE 'WIL%'`. |
+| **Operational Flag Exceptions** | Inspected Serang station (`SG`) configuration. | **Verified** ✅ | Serang has `fg_enable=0` despite operating 14 daily departures. Schema must never filter on `fg_enable=1`. |
+| **Line Brand Extraction** | Cross-referenced `ka_name` across corridor payloads. | **Verified** ✅ | Consistently carries clean commercial designations (`"COMMUTER LINE CIKARANG"`). Mapped directly to `trips.line_name`. |
+| **Transit Field Typings** | Inspected itinerary payloads for transfer interchange representations. | **Verified** ✅ | Returns `""` (empty string) when absent, or `string[]` of hex color codes when present. Normalized via Zod at boundary. |
+| **Weekday Uniformity** | Comparative diff between Tuesday and Thursday board captures. | Open | Assumed identical based on operational domain standards; verifiable via multi-day capture comparison. |
+| **Itinerary Census Coverage** | Total network itinerary census probe. | Open | Determines whether the fallback reconstruction path remains an exceptional fallback or a standard path. |
+| **Annual Holiday Rules** | Cross-check national SKB 3 Menteri holiday decrees against captured dates. | Open | Requires annual maintenance of the `holidays` configuration table. |
+
+---
+
+## 13. Architectural Summary
+
+```
+                      DATA INTEGRITY SAFEGUARDS
+                      
+   API Source                                      Storage Core
+┌──────────────┐                                ┌────────────────┐
+│  Raw JSON    │──( Deterministic Serialization )──▶ Git Archive  │
+└──────────────┘                                └───────┬────────┘
+                                                        │
+                                                        ▼
+┌──────────────┐                                ┌────────────────┐
+│ 11 Build-Time│◀──────( Invariant Engine )──────│ SQLite STRICT  │
+│  Assertions  │                                │  Database Core │
+└──────────────┘                                └───────┬────────┘
+                                                        │
+                                                        ▼
+                                                ┌────────────────┐
+                                                │  GTFS Export   │
+                                                └────────────────┘
+```
+
+The system guarantees schedule correctness through four complementary design layers:
+- **Exhaustive Discovery:** Departure boards provide complete spatial and temporal coverage of the active network without relying on heuristic ID guessing.
+- **Authoritative Enrichment:** Stop sequences and sub-minute arrival timings are populated directly from official itinerary arrays.
+- **Fail-Fast Invariant Suite:** Eleven strict structural invariants prevent corrupted, drifted, or truncated upstream data from silently landing in release builds.
+- **Permanent Archival Foundation:** Committing deterministic, raw JSON payloads decouples downstream data modeling from the upstream collection process, ensuring full reproducibility regardless of external API lifecycles.
