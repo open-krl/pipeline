@@ -15,6 +15,8 @@ Ingest the current Kereta Commuter Indonesia (KRL) timetable edition from KCI's 
 
 ### Scope Boundaries
 * **In Scope (v1.1):** Three day-type captures (weekday, Saturday, Sunday), a single enrichment census, offline validation/build pipeline, and GTFS export.
+  - **Regional Scope:** Active initial scope is `jabodetabek` (`group_wil: 0`, covering 94 operational stations across Jabodetabek and the Merak branch).
+  - **Yogyakarta–Solo Readiness:** The Yogyakarta–Solo & Prameks network (`group_wil: 6`, 17 stations) is fully supported by the API and schema, but decoupled via modular `region_scope` configuration to prevent cross-network invariant failure.
 * **Dropped / Out of Scope:** PDF timetable schedule reconciliation and text-layer scraping. PDF timetable extraction has been dropped due to fragile layout formatting, manual publishing discrepancies, and high parsing maintenance overhead. The operational API is the sole source of truth.
 * **Deferred:** Cloudflare D1 serving deployment and automated transfer graph generation (`transfers.txt`).
 
@@ -39,7 +41,7 @@ The upstream system exposes three core HTTP JSON endpoints:
                                   │ Station Master
                                   ▼
            ┌──────────────────────────────────────────────┐
-           │ For each valid sta_id:                       │
+           │ For each valid sta_id in active region_scope:│
            │ GET /api/krl/schedules?stationid={id}&...    │
            └──────────────────────┬───────────────────────┘
                                   │ Station Boards (Full Day Window)
@@ -59,9 +61,12 @@ The upstream system exposes three core HTTP JSON endpoints:
 ### 2.1 `GET /api/krl/stations`
 Station master catalog. Envelope: `{ status: 200, message: "Success", data: [...] }`. Fields: `sta_id`, `sta_name`, `group_wil`, `fg_enable`.
 
-- **Ingestion Filter:** `sta_id NOT LIKE 'WIL%'`. Rows starting with `WIL*` (`WIL0` Jabodetabek, `WIL1` Merak, `WIL6` Yogyakarta) represent regional dropdown section headers with `fg_enable=0`, not physical stations.
+- **Regional Grouping (`group_wil`):** The upstream system cleanly partitions physical networks via `group_wil`:
+  - `group_wil = 0`: Jabodetabek and Merak line stations (94 physical stations).
+  - `group_wil = 6`: Yogyakarta–Solo and Kutoarjo Prameks stations (17 physical stations).
+- **Ingestion Filter:** `sta_id NOT LIKE 'WIL%' AND group_wil IN (:allowed_groups)`. Rows starting with `WIL*` (`WIL0` Jabodetabek, `WIL1` Merak, `WIL6` Yogyakarta) represent regional dropdown section headers with `fg_enable=0`, not physical stations.
 - **Physical Station Ingestion Rule:** Do **not** filter out `fg_enable=0`. Station `SG` ("SERANG") is flagged with `fg_enable=0` in the station master despite being fully operational (14 daily departures and active stops on Merak line itineraries). Restricting ingestion to `fg_enable=1` drops Serang and breaks referential integrity on Merak corridor trips.
-- **Regional Grouping (`group_wil`):** `group_wil=6` isolates Yogyakarta–Solo stations (17 stations). Merak line stations share `group_wil=0` with Jabodetabek, meaning `group_wil=0` cannot be used to isolate Jabodetabek from Merak.
+- **Modular Scope Configuration:** By parameterizing the active scope (`region_scope`), `capture` queries 94 stations for Jabodetabek+Merak without touching Yogyakarta. Expanding to Yogyakarta later is a 1-line configuration update (`allowed_groups: [0, 6]`), with zero architectural rework.
 
 ### 2.2 `GET /api/krl/schedules?stationid=&timefrom=&timeto=`
 Station departures board for a requested time window (`HH:MM`). Setting `timefrom=00:00&timeto=23:59` returns the complete repeating timetable pattern for that station in a single request. Envelope: `{ status: 200, data: [...] }`.
@@ -262,6 +267,7 @@ CREATE TABLE snapshots (
     snapshot_id       INTEGER PRIMARY KEY AUTOINCREMENT,
     snapshot_date     TEXT NOT NULL,
     day_type          TEXT NOT NULL CHECK (day_type IN ('weekday', 'saturday', 'sunday', 'holiday')),
+    region_scope      TEXT NOT NULL CHECK (region_scope IN ('jabodetabek', 'yogyakarta', 'all')),
     fetched_at        TEXT NOT NULL CHECK (fetched_at = strftime('%Y-%m-%dT%H:%M:%SZ', fetched_at)),
     status            TEXT NOT NULL CHECK (status IN ('complete', 'degraded')),
     timetable_version INTEGER NOT NULL,
@@ -341,7 +347,7 @@ The ingestion engine executes eleven assertions during the build process. Any in
 8. **Cross-Capture Suffix Transition Bounds:** When comparing trip revisions across capture editions for a stable base number, operational suffix drift must advance incrementally ($\le +1$). Skipping revisions or unparseable mutations flags service path changes.
 9. **Referential Integrity on Inferred Stations:** All station identifiers extracted from `route_name` or itinerary entries must resolve against valid, non-header rows in the `stations` table (`sta_id NOT LIKE 'WIL%'`).
 10. **Atomic Capture Integrity:** If any station board query experiences an unrecoverable failure or network timeout during a capture run, the entire capture is marked `degraded` and rejected for build purposes.
-11. **Cross-Capture Edition Consistency:** All captures feeding an export must share an identical timetable edition hash. If an upstream timetable change occurs mid-campaign, the run must be aborted and restarted.
+11. **Cross-Capture Edition Consistency:** All captures feeding an export within the same `region_scope` must share an identical timetable edition hash. Hashing is scoped to the active region's stations, ensuring an upstream schedule revision in Yogyakarta does not invalidate a concurrent Jabodetabek campaign. If an upstream timetable change occurs mid-campaign within the active scope, the run must be aborted and restarted.
 
 ---
 
@@ -463,6 +469,7 @@ Transient network failures during `capture` or `census` trigger exponential back
 | **9** | **Resumable Local Census Caching**. | Re-scraping itineraries on every run. | High upstream request latencies (5–10 s) make full re-scraping prohibitive; file caches allow progressive, interruptible enrichment. |
 | **10** | **Timetable Document Model**. | Real-time event stream ingestion. | The API acts as an undated document server; single full-day queries capture the entirety of a repeating operational schedule. |
 | **11** | **Embedded SQLite Engine (STRICT Mode)**. | Centralized PostgreSQL instance. | Minimizes operational overhead, avoids database server maintenance, and aligns with potential edge deployment targets (Cloudflare D1). |
+| **12** | **Region-Scoped Ingestion & Fingerprinting**. | Global monolithic capture across all stations nationwide. | KCI operates two geographically disjoint commuter networks (Jabodetabek/Merak with `group_wil: 0` vs Yogyakarta/Solo with `group_wil: 6`). Regional scoping decouples capture campaigns, isolates edition hash validation (Invariant 11), and allows expanding to Yogyakarta later via a single configuration parameter without invalidating historical snapshots. |
 
 ---
 
