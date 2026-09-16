@@ -17,6 +17,7 @@ import {
 	DEFAULT_REGION_SCOPE,
 	REGION_GROUPS,
 	type RegionScope,
+	resolveStationCode,
 } from "../config";
 import { formatDateWib, resolveDayType } from "../core/calendar";
 import { type CommitSnapshotResult, commitCaptureSnapshot } from "../core/git";
@@ -294,19 +295,22 @@ export async function fetchDepartureBoards(
 
 	await Promise.all(
 		operationalStations.map(async (station) => {
+			const resolvedId = resolveStationCode(station.sta_id);
 			try {
-				const schedule = await client.fetchStationSchedule(station.sta_id);
-				boardsMap.set(station.sta_id, schedule.data);
-				rawBoardsMap.set(station.sta_id, schedule);
+				const schedule = await client.fetchStationSchedule(resolvedId);
+				boardsMap.set(resolvedId, schedule.data);
+				rawBoardsMap.set(resolvedId, schedule);
 				completedCount++;
+				const aliasInfo =
+					resolvedId !== station.sta_id ? ` -> ${resolvedId}` : "";
 				console.log(
-					`[${String(completedCount).padStart(2, " ")}/${totalStations}] OK    ${station.sta_id.padEnd(5, " ")} (${station.sta_name}) - ${schedule.data.length} departures`,
+					`[${String(completedCount).padStart(2, " ")}/${totalStations}] OK    ${(station.sta_id + aliasInfo).padEnd(10, " ")} (${station.sta_name}) - ${schedule.data.length} departures`,
 				);
 			} catch (err) {
 				completedCount++;
 				const reason = err instanceof Error ? err.message : String(err);
 				failedStations.push({
-					id: station.sta_id,
+					id: resolvedId,
 					name: station.sta_name,
 					reason,
 				});

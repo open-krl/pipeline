@@ -53,3 +53,23 @@ export const CORRIDOR_REFERENCE_STATIONS = {
 	bekasi: "BKS",
 	rangkasbitung: "RK",
 } as const;
+
+/**
+ * Station code overrides for known upstream KCI API defects.
+ *
+ * Upstream defect: KCI's station catalog (`/api/krl/stations`) registers Grogol
+ * under `GGL`. However, the station departure board endpoint (`/api/krl/schedules?stationid=...`)
+ * returns 404 for `GGL`, train itinerary stops (`/api/krl/train-schedule`) emit `GRG`, and
+ * official KCI published timetable PDFs print `GRG`.
+ *
+ * Mapping `GGL` -> `GRG` during departure board queries and persistence ensures that
+ * all downstream components (departure boards, itineraries, GIS coordinates, and SQLite)
+ * share the canonical telegraphic code `GRG`.
+ */
+export const STATION_CODE_OVERRIDES: Readonly<Record<string, string>> = {
+	GGL: "GRG",
+};
+
+export function resolveStationCode(stationId: string): string {
+	return STATION_CODE_OVERRIDES[stationId] ?? stationId;
+}

@@ -375,4 +375,70 @@ describe("src/commands/capture", () => {
 		expect(result2.timetable_version).toBe(1);
 		expect(result2.snapshot_id).toBe(2);
 	});
+
+	it("resolves GGL station code anomaly to GRG when fetching and writing departure boards", async () => {
+		const stationsWithGgl: StationMasterResponse = {
+			status: 200,
+			message: "success",
+			data: [
+				{
+					sta_id: "GGL",
+					sta_name: "GROGOL",
+					group_wil: 0,
+					fg_enable: 1,
+				},
+			],
+		};
+
+		let queriedStationId = "";
+		const mockFetch = async (input: RequestInfo | URL) => {
+			const url = input instanceof Request ? input.url : String(input);
+			if (url.includes("/api/krl/stations")) {
+				return new Response(JSON.stringify(stationsWithGgl), {
+					status: 200,
+					headers: { "Content-Type": "application/json" },
+				});
+			}
+			const match = url.match(/stationid=([A-Z0-9]+)/);
+			if (match) {
+				queriedStationId = match[1];
+			}
+			return new Response(JSON.stringify(mockMriBoard), {
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			});
+		};
+
+		const client = new KciClient({
+			fetchFn: mockFetch,
+			pacingMs: 0,
+			retryBaseMs: 1,
+		});
+
+		const result = await executeCapture({
+			client,
+			dataDir: TEST_SCRATCH_DIR,
+			dayType: "weekday",
+		});
+
+		// Queried station ID must be resolved to GRG
+		expect(queriedStationId).toBe("GRG");
+		expect(result.manifest.status).toBe("complete");
+
+		// Board file must be saved as GRG.json
+		const grgBoardExists = await fs
+			.access(path.join(result.snapshot_dir, "boards/GRG.json"))
+			.then(() => true)
+			.catch(() => false);
+		expect(grgBoardExists).toBe(true);
+
+		// Raw stations.json must retain raw GGL
+		const savedStations = JSON.parse(
+			await fs.readFile(
+				path.join(result.snapshot_dir, "stations.json"),
+				"utf-8",
+			),
+		);
+		expect(savedStations.data[0].sta_id).toBe("GGL");
+	});
 });
