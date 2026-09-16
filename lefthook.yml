@@ -6,8 +6,10 @@ pre-commit:
       run: bun run typecheck
     - name: lint
       glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"  
+      exclude: "(^data/|^tests/fixtures/)"
       run: bun run check
     - name: format
       glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"
+      exclude: "(^data/|^tests/fixtures/)"
       run: bun run format {staged_files}
       stage_fixed: true
