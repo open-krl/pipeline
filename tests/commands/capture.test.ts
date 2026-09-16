@@ -212,7 +212,7 @@ describe("src/commands/capture", () => {
 		const client2 = createMockClient({ stations: mutatedStations });
 
 		// Operator declines bump
-		expect(
+		await expect(
 			executeCapture({
 				client: client2,
 				dataDir: TEST_SCRATCH_DIR,
@@ -282,7 +282,7 @@ describe("src/commands/capture", () => {
 		const client2 = createMockClient({ mriBoard: mutatedMriBoard });
 
 		// Operator declines bump
-		expect(
+		await expect(
 			executeCapture({
 				client: client2,
 				dataDir: TEST_SCRATCH_DIR,

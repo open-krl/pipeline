@@ -219,7 +219,7 @@ describe("src/api/client - KciClient", () => {
 			maxRetries: 2,
 		});
 
-		expect(client.fetchStations()).rejects.toThrow("after 2 retries");
+		await expect(client.fetchStations()).rejects.toThrow("after 2 retries");
 		// initial attempt (0) + 2 retries = 3 calls
 		expect(callCount).toBe(3);
 	});
@@ -248,6 +248,6 @@ describe("src/api/client - KciClient", () => {
 			retryBaseMs: 5,
 		});
 
-		expect(client.fetchStations()).rejects.toThrow();
+		await expect(client.fetchStations()).rejects.toThrow();
 	});
 });
