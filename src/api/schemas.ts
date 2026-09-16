@@ -84,7 +84,7 @@ export type ItineraryObservation = z.infer<typeof ItineraryObservationSchema>;
 
 export const MultiObservationItinerarySchema = z.object({
 	train_id: z.string().min(1),
-	observations: z.record(DayTypeSchema, ItineraryObservationSchema),
+	observations: z.partialRecord(DayTypeSchema, ItineraryObservationSchema),
 });
 export type MultiObservationItinerary = z.infer<
 	typeof MultiObservationItinerarySchema

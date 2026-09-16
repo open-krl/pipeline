@@ -9,6 +9,7 @@ import {
 	scanSnapshots,
 	scanTimetableVersions,
 } from "./commands/capture";
+import { executeCensus } from "./commands/census";
 import { formatSnapshotTable, getSnapshotList } from "./commands/snapshots";
 import { type RegionScope, RegionScopeSchema } from "./config";
 import { commitCaptureSnapshot } from "./core/git";
@@ -43,6 +44,13 @@ Capture Options:
   --data-dir <path>    Override raw data root directory [default: data/raw]
   --commit             Automatically commit captured snapshot to git
   --no-commit          Skip committing snapshot to git
+
+Census Options:
+  --day-type <type>    Target day type (weekday, saturday, sunday, holiday)
+  --reprobe-all        Force reprobe all active trains for day type
+  --version <number>   Specific timetable version [default: latest]
+  --data-dir <path>    Override raw data root directory [default: data/raw]
+  --commit             Automatically commit captured itineraries to git
 
 Commit Snapshot Usage:
   bun src/cli.ts commit-snapshot [version] [snapshot_id] [--data-dir <path>]
@@ -249,7 +257,93 @@ List Snapshots Usage:
 			break;
 		}
 
-		case "census":
+		case "census": {
+			const { values, positionals } = parseArgs({
+				args: args.slice(1),
+				options: {
+					"day-type": { type: "string" },
+					"reprobe-all": { type: "boolean", default: false },
+					version: { type: "string" },
+					"data-dir": { type: "string" },
+					commit: { type: "boolean", default: false },
+					yes: { type: "boolean", default: false },
+				},
+				allowPositionals: true,
+			});
+
+			let dayType: DayType | undefined;
+			if (values["day-type"]) {
+				const res = DayTypeSchema.safeParse(values["day-type"]);
+				if (!res.success) {
+					console.error(
+						`Error: Invalid --day-type '${values["day-type"]}'. Allowed values: ${Object.values(DayTypeSchema.enum).join(", ")}`,
+					);
+					process.exit(1);
+				}
+				dayType = res.data;
+			}
+
+			let dataDir: string | undefined;
+			if (values["data-dir"]) {
+				try {
+					dataDir = resolveSafePath(values["data-dir"]);
+				} catch (err) {
+					console.error(
+						`Error: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+			}
+
+			const versionStr = values.version ?? positionals[0];
+			const version = versionStr ? Number.parseInt(versionStr, 10) : undefined;
+			if (version !== undefined && Number.isNaN(version)) {
+				console.error(
+					`Error: Invalid version '${versionStr}'. Must be an integer.`,
+				);
+				process.exit(1);
+			}
+
+			console.log("Starting KRL itinerary census crawl...");
+			try {
+				const result = await executeCensus({
+					dayType,
+					reprobeAll: values["reprobe-all"],
+					version,
+					dataDir,
+					commit: values.commit,
+					yes: values.yes,
+				});
+
+				console.log(`
+── Census Summary ───────────────────────────────────────────
+Timetable Version:  ${result.version}
+Day Type:           ${result.dayType}
+Total Discovered:   ${result.totalDiscovered} trains
+Newly Probed:       ${result.totalProbed} (${result.successCount} OK, ${result.notFoundCount} 404/suspended)
+Already Cached:     ${result.cachedCount} trains
+Failed / Errors:    ${result.failedCount} trains
+Duration:           ${result.durationSecs}s
+─────────────────────────────────────────────────────────────
+`);
+				if (result.commitResult) {
+					if (result.commitResult.committed) {
+						console.log(
+							`Committed census itineraries: ${result.commitResult.commitHash?.slice(0, 7)}`,
+						);
+					} else {
+						console.log(`Git commit skipped: ${result.commitResult.reason}`);
+					}
+				}
+			} catch (err) {
+				console.error(
+					`Census failed: ${err instanceof Error ? err.message : String(err)}`,
+				);
+				process.exit(1);
+			}
+			break;
+		}
+
 		case "build":
 		case "export":
 		case "calendar":
