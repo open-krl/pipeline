@@ -2,7 +2,6 @@ import { Database } from "bun:sqlite";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { readFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import * as schema from "./tables";
 
 /**
  * Build is a pure fold: the DB is a derived artifact, recreated from scratch
