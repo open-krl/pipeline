@@ -417,54 +417,69 @@ export async function writeSnapshotToDisk(
 			? targetVersionSnapshots[targetVersionSnapshots.length - 1].id + 1
 			: 1;
 
-	const snapshotDir = path.join(
+	const capturesParent = path.join(
 		params.dataDir,
 		String(params.versionToUse),
 		"captures",
-		String(nextSnapshotId),
 	);
-	const boardsDir = path.join(snapshotDir, "boards");
-
-	await fs.mkdir(boardsDir, { recursive: true });
-
-	await fs.writeFile(
-		path.join(snapshotDir, "stations.json"),
-		JSON.stringify(params.stationsResponse, null, 2),
-		"utf-8",
+	const snapshotDir = path.join(capturesParent, String(nextSnapshotId));
+	const tmpDir = path.join(
+		capturesParent,
+		`.tmp_${nextSnapshotId}_${Date.now()}`,
 	);
+	const tmpBoardsDir = path.join(tmpDir, "boards");
 
-	for (const [staId, boardData] of params.rawBoardsMap.entries()) {
+	await fs.mkdir(tmpBoardsDir, { recursive: true });
+
+	try {
 		await fs.writeFile(
-			path.join(boardsDir, `${staId}.json`),
-			JSON.stringify(boardData, null, 2),
+			path.join(tmpDir, "stations.json"),
+			JSON.stringify(params.stationsResponse, null, 2),
 			"utf-8",
 		);
+
+		for (const [staId, boardData] of params.rawBoardsMap.entries()) {
+			await fs.writeFile(
+				path.join(tmpBoardsDir, `${staId}.json`),
+				JSON.stringify(boardData, null, 2),
+				"utf-8",
+			);
+		}
+
+		const manifest: CaptureManifest = {
+			timetable_version: params.versionToUse,
+			snapshot_id: nextSnapshotId,
+			snapshot_date: params.snapshotDate,
+			day_type: params.resolvedDayType,
+			region_scope: params.regionScope,
+			station_master_hash: params.currentStationMasterHash,
+			board_response_hash: params.currentBoardResponseHash,
+			fetched_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+			status: params.isDegraded ? "degraded" : "complete",
+		};
+
+		// Validate manifest schema before promoting to disk
+		CaptureManifestSchema.parse(manifest);
+
+		await fs.writeFile(
+			path.join(tmpDir, "manifest.json"),
+			JSON.stringify(manifest, null, 2),
+			"utf-8",
+		);
+
+		// Atomically promote temporary directory to destination snapshotDir
+		await fs.rename(tmpDir, snapshotDir);
+
+		return {
+			timetable_version: params.versionToUse,
+			snapshot_id: nextSnapshotId,
+			snapshot_dir: snapshotDir,
+			manifest,
+		};
+	} catch (err) {
+		await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+		throw err;
 	}
-
-	const manifest: CaptureManifest = {
-		timetable_version: params.versionToUse,
-		snapshot_id: nextSnapshotId,
-		snapshot_date: params.snapshotDate,
-		day_type: params.resolvedDayType,
-		region_scope: params.regionScope,
-		station_master_hash: params.currentStationMasterHash,
-		board_response_hash: params.currentBoardResponseHash,
-		fetched_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
-		status: params.isDegraded ? "degraded" : "complete",
-	};
-
-	await fs.writeFile(
-		path.join(snapshotDir, "manifest.json"),
-		JSON.stringify(manifest, null, 2),
-		"utf-8",
-	);
-
-	return {
-		timetable_version: params.versionToUse,
-		snapshot_id: nextSnapshotId,
-		snapshot_dir: snapshotDir,
-		manifest,
-	};
 }
 
 /**

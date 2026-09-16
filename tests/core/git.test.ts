@@ -162,6 +162,35 @@ describe("src/core/git", () => {
 			expect(stdout.trim()).toBe("src/unrelated.ts");
 		});
 
+		it("refuses to commit if staging area contains sibling snapshot with prefix collision", async () => {
+			const snapshotDir1 = path.join(tempDir, "data/raw/1/captures/1");
+			const snapshotDir10 = path.join(tempDir, "data/raw/1/captures/10");
+			await fs.mkdir(snapshotDir1, { recursive: true });
+			await fs.mkdir(snapshotDir10, { recursive: true });
+			await fs.writeFile(
+				path.join(snapshotDir1, "manifest.json"),
+				JSON.stringify(sampleManifest, null, 2),
+			);
+			await fs.writeFile(
+				path.join(snapshotDir10, "manifest.json"),
+				JSON.stringify({ ...sampleManifest, snapshot_id: 10 }, null, 2),
+			);
+
+			// Stage sibling snapshot 10 (e.g. data/raw/1/captures/10/manifest.json)
+			await execFileAsync("git", ["add", "data/raw/1/captures/10"], {
+				cwd: tempDir,
+			});
+
+			const result = await commitCaptureSnapshot({
+				snapshotDir: snapshotDir1,
+				manifest: sampleManifest,
+				cwd: tempDir,
+			});
+
+			expect(result.committed).toBe(false);
+			expect(result.reason).toContain("unrelated staged file");
+		});
+
 		it("successfully and atomically commits snapshot directory", async () => {
 			const snapshotDir = path.join(tempDir, "data/raw/1/captures/1");
 			await fs.mkdir(path.join(snapshotDir, "boards"), { recursive: true });

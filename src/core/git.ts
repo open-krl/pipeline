@@ -158,6 +158,11 @@ export async function commitCaptureSnapshot(
 	}
 
 	// 5. Contamination Guard: Ensure no other files are already staged
+	const normalizedSnapshotDir = relativeSnapshotDir.split(path.sep).join("/");
+	const isInsideSnapshotDir = (file: string) =>
+		file === normalizedSnapshotDir ||
+		file.startsWith(`${normalizedSnapshotDir}/`);
+
 	try {
 		const { stdout: stagedBefore } = await execFileAsync(
 			"git",
@@ -166,7 +171,7 @@ export async function commitCaptureSnapshot(
 		);
 		const alreadyStaged = stagedBefore.trim().split("\n").filter(Boolean);
 		const unrelatedStaged = alreadyStaged.filter(
-			(file) => !file.startsWith(relativeSnapshotDir),
+			(file) => !isInsideSnapshotDir(file),
 		);
 		if (unrelatedStaged.length > 0) {
 			return {
@@ -200,7 +205,7 @@ export async function commitCaptureSnapshot(
 		);
 		const nowStaged = stagedAfter.trim().split("\n").filter(Boolean);
 		const violatingFiles = nowStaged.filter(
-			(file) => !file.startsWith(relativeSnapshotDir),
+			(file) => !isInsideSnapshotDir(file),
 		);
 		if (violatingFiles.length > 0) {
 			// Rollback stage immediately
