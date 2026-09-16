@@ -44,6 +44,20 @@ export interface CaptureResult {
 	manifest: CaptureManifest;
 }
 
+export interface FailedStation {
+	id: string;
+	name: string;
+	reason: string;
+}
+
+export interface BoardFetchResult {
+	boardsMap: Map<string, DepartureBoardItem[]>;
+	rawBoardsMap: Map<string, DepartureBoardResponse>;
+	failedStations: FailedStation[];
+	isDegraded: boolean;
+	durationSecs: string;
+}
+
 /**
  * Standard CLI prompt helper using node:readline.
  */
@@ -80,7 +94,6 @@ export async function scanTimetableVersions(
 			.map((e) => Number.parseInt(e.name, 10))
 			.sort((a, b) => a - b);
 	} catch {
-		// Directory does not exist yet
 		return [];
 	}
 }
@@ -121,86 +134,146 @@ export async function scanSnapshots(
 }
 
 /**
- * Executes the full live capture pipeline (§8.1, §8.2).
+ * Filters the station list to operational passenger stops in the active region.
  */
-export async function executeCapture(
-	options: CaptureOptions = {},
-): Promise<CaptureResult> {
-	const dataDir = options.dataDir ?? path.resolve(process.cwd(), "data/raw");
-	const client = options.client ?? new KciClient();
-	const regionScope = options.region ?? DEFAULT_REGION_SCOPE;
-	const now = options.now ?? new Date();
-	const prompt = options.promptFn ?? defaultPrompt;
-
-	// Resolve Day Type & Date
-	const holidays = loadHolidays(options.holidaysPath);
-	const snapshotDate = formatDateWib(now);
-	const resolvedDayType = options.dayType ?? resolveDayType(now, holidays);
-
-	// 1. Fetch Station Master Catalog
-	const stationsResponse: StationMasterResponse = await client.fetchStations();
+export function filterOperationalStations(
+	stations: readonly StationItem[],
+	regionScope: RegionScope,
+): StationItem[] {
 	const allowedGroups = REGION_GROUPS[regionScope];
-	const operationalStations = stationsResponse.data.filter((s: StationItem) => {
+	const operational = stations.filter((s) => {
 		if (s.sta_id.startsWith("WIL")) return false;
 		if (!allowedGroups.includes(s.group_wil)) return false;
 		return s.fg_enable === 1;
 	});
 
-	if (operationalStations.length === 0) {
+	if (operational.length === 0) {
 		throw new Error(
 			`No operational stations found for region scope '${regionScope}'.`,
 		);
 	}
 
-	const currentStationMasterHash =
-		computeStationMasterHash(operationalStations);
+	return operational;
+}
 
-	// Determine active timetable version
-	const existingVersions = await scanTimetableVersions(dataDir);
+/**
+ * Normalizes capture options into resolved operational parameters.
+ */
+export function resolveCaptureContext(options: CaptureOptions) {
+	const dataDir = options.dataDir ?? path.resolve(process.cwd(), "data/raw");
+	const client = options.client ?? new KciClient();
+	const regionScope = options.region ?? DEFAULT_REGION_SCOPE;
+	const now = options.now ?? new Date();
+	const prompt = options.promptFn ?? defaultPrompt;
+	const holidays = loadHolidays(options.holidaysPath);
+	const snapshotDate = formatDateWib(now);
+	const resolvedDayType = options.dayType ?? resolveDayType(now, holidays);
+
+	return {
+		dataDir,
+		client,
+		regionScope,
+		now,
+		prompt,
+		snapshotDate,
+		resolvedDayType,
+		newVersion: Boolean(options.newVersion),
+		yes: Boolean(options.yes),
+	};
+}
+
+export interface Gate1Params {
+	dataDir: string;
+	currentStationMasterHash: string;
+	newVersion: boolean;
+	yes: boolean;
+	prompt: (question: string, defaultYes?: boolean) => Promise<boolean>;
+}
+
+export interface Gate1Result {
+	activeVersion: number;
+	versionToUse: number;
+	shouldBumpVersion: boolean;
+}
+
+/**
+ * Gate 1: Compares active station catalog hash against existing versions (§8.1).
+ */
+export async function evaluateGate1(params: Gate1Params): Promise<Gate1Result> {
+	const existingVersions = await scanTimetableVersions(params.dataDir);
 	const activeVersion =
 		existingVersions.length > 0
 			? existingVersions[existingVersions.length - 1]
 			: 1;
-	let versionToUse = activeVersion;
-	let shouldBumpVersion = Boolean(options.newVersion);
 
-	if (options.newVersion && existingVersions.length > 0) {
-		versionToUse = activeVersion + 1;
+	if (params.newVersion && existingVersions.length > 0) {
+		return {
+			activeVersion,
+			versionToUse: activeVersion + 1,
+			shouldBumpVersion: true,
+		};
 	}
 
-	// Gate 1: Network Station Catalog Gate (§8.1)
-	if (!options.newVersion && existingVersions.length > 0) {
-		const existingSnapshots = await scanSnapshots(dataDir, activeVersion);
-		if (existingSnapshots.length > 0) {
-			const latestManifest =
-				existingSnapshots[existingSnapshots.length - 1].manifest;
-			if (latestManifest.station_master_hash !== currentStationMasterHash) {
-				const promptMsg = `[Gate 1 Alert] Station master hash differs from active version ${activeVersion} (${latestManifest.station_master_hash.slice(0, 8)} -> ${currentStationMasterHash.slice(0, 8)}). Network catalog mutated. Increment timetable version to ${activeVersion + 1}?`;
+	if (existingVersions.length === 0) {
+		return {
+			activeVersion: 1,
+			versionToUse: 1,
+			shouldBumpVersion: false,
+		};
+	}
 
-				if (options.yes) {
-					throw new Error(
-						`Capture halted by Gate 1 in non-interactive mode: station master hash mutated without --new-version flag.`,
-					);
-				}
+	const existingSnapshots = await scanSnapshots(params.dataDir, activeVersion);
+	if (existingSnapshots.length === 0) {
+		return {
+			activeVersion,
+			versionToUse: activeVersion,
+			shouldBumpVersion: false,
+		};
+	}
 
-				const confirmed = await prompt(promptMsg, false);
-				if (!confirmed) {
-					throw new Error(
-						`[Gate 1 Alert] Capture aborted by operator: station master hash mismatch with active version ${activeVersion}.`,
-					);
-				}
-				shouldBumpVersion = true;
-				versionToUse = activeVersion + 1;
-			}
+	const latestManifest =
+		existingSnapshots[existingSnapshots.length - 1].manifest;
+	if (latestManifest.station_master_hash !== params.currentStationMasterHash) {
+		const promptMsg = `[Gate 1 Alert] Station master hash differs from active version ${activeVersion} (${latestManifest.station_master_hash.slice(0, 8)} -> ${params.currentStationMasterHash.slice(0, 8)}). Network catalog mutated. Increment timetable version to ${activeVersion + 1}?`;
+
+		if (params.yes) {
+			throw new Error(
+				"Capture halted by Gate 1 in non-interactive mode: station master hash mutated without --new-version flag.",
+			);
 		}
+
+		const confirmed = await params.prompt(promptMsg, false);
+		if (!confirmed) {
+			throw new Error(
+				`[Gate 1 Alert] Capture aborted by operator: station master hash mismatch with active version ${activeVersion}.`,
+			);
+		}
+
+		return {
+			activeVersion,
+			versionToUse: activeVersion + 1,
+			shouldBumpVersion: true,
+		};
 	}
 
-	// 2. In-Memory Departure Board Fan-Out (Concurrency = 3, Paced)
+	return {
+		activeVersion,
+		versionToUse: activeVersion,
+		shouldBumpVersion: false,
+	};
+}
+
+/**
+ * Executes paced concurrent fan-out across all operational station departure boards.
+ */
+export async function fetchDepartureBoards(
+	operationalStations: readonly StationItem[],
+	client: KciClient,
+): Promise<BoardFetchResult> {
 	const startTime = Date.now();
 	const boardsMap = new Map<string, DepartureBoardItem[]>();
 	const rawBoardsMap = new Map<string, DepartureBoardResponse>();
-	const failedStations: Array<{ id: string; name: string; reason: string }> =
-		[];
+	const failedStations: FailedStation[] = [];
 	let completedCount = 0;
 	const totalStations = operationalStations.length;
 
@@ -235,52 +308,112 @@ export async function executeCapture(
 		);
 	}
 
-	const isDegraded = failedStations.length > 0;
-	const currentBoardResponseHash = computeBoardResponseHash(boardsMap);
+	const durationSecs = ((Date.now() - startTime) / 1000).toFixed(1);
+	return {
+		boardsMap,
+		rawBoardsMap,
+		failedStations,
+		isDegraded: failedStations.length > 0,
+		durationSecs,
+	};
+}
 
-	// Gate 2: Timetable Edition Gate (§8.1)
-	if (!shouldBumpVersion && existingVersions.length > 0) {
-		const existingSnapshots = await scanSnapshots(dataDir, versionToUse);
-		const sameDayTypeSnapshot = existingSnapshots.find(
-			(s) => s.manifest.day_type === resolvedDayType,
-		);
+export interface Gate2Params {
+	dataDir: string;
+	versionToUse: number;
+	shouldBumpVersion: boolean;
+	resolvedDayType: DayType;
+	currentBoardResponseHash: string;
+	yes: boolean;
+	prompt: (question: string, defaultYes?: boolean) => Promise<boolean>;
+}
 
-		if (sameDayTypeSnapshot) {
-			const existingHash = sameDayTypeSnapshot.manifest.board_response_hash;
-			if (existingHash !== currentBoardResponseHash) {
-				const promptMsg = `[Gate 2 Alert] Board signature differs for day type '${resolvedDayType}' compared to snapshot ${sameDayTypeSnapshot.id} (${existingHash.slice(0, 8)} -> ${currentBoardResponseHash.slice(0, 8)}). Potential timetable edition revision. Increment timetable version to ${versionToUse + 1}?`;
+export interface Gate2Result {
+	versionToUse: number;
+	shouldBumpVersion: boolean;
+}
 
-				if (options.yes) {
-					throw new Error(
-						`[Gate 2 Alert] Capture halted in non-interactive mode: board response signature differs for day type '${resolvedDayType}' without --new-version flag.`,
-					);
-				}
+/**
+ * Gate 2: Compares board signature against existing same-day-type snapshots (§8.1).
+ */
+export async function evaluateGate2(params: Gate2Params): Promise<Gate2Result> {
+	if (params.shouldBumpVersion) {
+		return {
+			versionToUse: params.versionToUse,
+			shouldBumpVersion: true,
+		};
+	}
 
-				const confirmed = await prompt(promptMsg, false);
-				if (!confirmed) {
-					throw new Error(
-						`[Gate 2 Alert] Capture aborted by operator: board response signature differs for day type '${resolvedDayType}'.`,
-					);
-				}
-				versionToUse = versionToUse + 1;
-				shouldBumpVersion = true;
+	const existingSnapshots = await scanSnapshots(
+		params.dataDir,
+		params.versionToUse,
+	);
+	const sameDayTypeSnapshot = existingSnapshots.find(
+		(s) => s.manifest.day_type === params.resolvedDayType,
+	);
+
+	if (sameDayTypeSnapshot) {
+		const existingHash = sameDayTypeSnapshot.manifest.board_response_hash;
+		if (existingHash !== params.currentBoardResponseHash) {
+			const promptMsg = `[Gate 2 Alert] Board signature differs for day type '${params.resolvedDayType}' compared to snapshot ${sameDayTypeSnapshot.id} (${existingHash.slice(0, 8)} -> ${params.currentBoardResponseHash.slice(0, 8)}). Potential timetable edition revision. Increment timetable version to ${params.versionToUse + 1}?`;
+
+			if (params.yes) {
+				throw new Error(
+					`[Gate 2 Alert] Capture halted in non-interactive mode: board response signature differs for day type '${params.resolvedDayType}' without --new-version flag.`,
+				);
 			}
+
+			const confirmed = await params.prompt(promptMsg, false);
+			if (!confirmed) {
+				throw new Error(
+					`[Gate 2 Alert] Capture aborted by operator: board response signature differs for day type '${params.resolvedDayType}'.`,
+				);
+			}
+
+			return {
+				versionToUse: params.versionToUse + 1,
+				shouldBumpVersion: true,
+			};
 		}
 	}
 
-	// Determine next snapshot ID in target version
-	const targetVersionSnapshots = shouldBumpVersion
+	return {
+		versionToUse: params.versionToUse,
+		shouldBumpVersion: false,
+	};
+}
+
+export interface WriteSnapshotParams {
+	dataDir: string;
+	versionToUse: number;
+	shouldBumpVersion: boolean;
+	snapshotDate: string;
+	resolvedDayType: DayType;
+	regionScope: RegionScope;
+	currentStationMasterHash: string;
+	currentBoardResponseHash: string;
+	isDegraded: boolean;
+	stationsResponse: StationMasterResponse;
+	rawBoardsMap: Map<string, DepartureBoardResponse>;
+}
+
+/**
+ * Persists station catalog, boards, and manifest atomically to disk.
+ */
+export async function writeSnapshotToDisk(
+	params: WriteSnapshotParams,
+): Promise<CaptureResult> {
+	const targetVersionSnapshots = params.shouldBumpVersion
 		? []
-		: await scanSnapshots(dataDir, versionToUse);
+		: await scanSnapshots(params.dataDir, params.versionToUse);
 	const nextSnapshotId =
 		targetVersionSnapshots.length > 0
 			? targetVersionSnapshots[targetVersionSnapshots.length - 1].id + 1
 			: 1;
 
-	// 3. Atomic Disk Persistence
 	const snapshotDir = path.join(
-		dataDir,
-		String(versionToUse),
+		params.dataDir,
+		String(params.versionToUse),
 		"captures",
 		String(nextSnapshotId),
 	);
@@ -288,15 +421,13 @@ export async function executeCapture(
 
 	await fs.mkdir(boardsDir, { recursive: true });
 
-	// Write stations.json
 	await fs.writeFile(
 		path.join(snapshotDir, "stations.json"),
-		JSON.stringify(stationsResponse, null, 2),
+		JSON.stringify(params.stationsResponse, null, 2),
 		"utf-8",
 	);
 
-	// Write each station board
-	for (const [staId, boardData] of rawBoardsMap.entries()) {
+	for (const [staId, boardData] of params.rawBoardsMap.entries()) {
 		await fs.writeFile(
 			path.join(boardsDir, `${staId}.json`),
 			JSON.stringify(boardData, null, 2),
@@ -304,17 +435,16 @@ export async function executeCapture(
 		);
 	}
 
-	// Write manifest.json
 	const manifest: CaptureManifest = {
-		timetable_version: versionToUse,
+		timetable_version: params.versionToUse,
 		snapshot_id: nextSnapshotId,
-		snapshot_date: snapshotDate,
-		day_type: resolvedDayType,
-		region_scope: regionScope,
-		station_master_hash: currentStationMasterHash,
-		board_response_hash: currentBoardResponseHash,
+		snapshot_date: params.snapshotDate,
+		day_type: params.resolvedDayType,
+		region_scope: params.regionScope,
+		station_master_hash: params.currentStationMasterHash,
+		board_response_hash: params.currentBoardResponseHash,
 		fetched_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
-		status: isDegraded ? "degraded" : "complete",
+		status: params.isDegraded ? "degraded" : "complete",
 	};
 
 	await fs.writeFile(
@@ -323,30 +453,113 @@ export async function executeCapture(
 		"utf-8",
 	);
 
-	const durationSecs = ((Date.now() - startTime) / 1000).toFixed(1);
-	const failedStr =
-		failedStations.length > 0
-			? ` (${failedStations.map((f) => `${f.id}: ${f.reason}`).join(", ")})`
-			: "";
-
-	console.log(`
-── Capture Summary ──────────────────────────────────────────
-Timetable Version:    ${versionToUse}
-Snapshot ID:          ${nextSnapshotId} (${resolvedDayType}, ${manifest.status})
-Operational Stations: ${totalStations}
-Successful Boards:    ${boardsMap.size}
-Failed Stations:      ${failedStations.length}${failedStr}
-Duration:             ${durationSecs}s
-Station Master Hash:  ${currentStationMasterHash.slice(0, 16)}...
-Board Response Hash:  ${currentBoardResponseHash.slice(0, 16)}...
-Saved to:             ${snapshotDir}
-─────────────────────────────────────────────────────────────
-`);
-
 	return {
-		timetable_version: versionToUse,
+		timetable_version: params.versionToUse,
 		snapshot_id: nextSnapshotId,
 		snapshot_dir: snapshotDir,
 		manifest,
 	};
+}
+
+/**
+ * Formats and displays the end-of-run capture summary box.
+ */
+export function printCaptureSummary(params: {
+	result: CaptureResult;
+	totalStations: number;
+	successfulBoardsCount: number;
+	failedStations: FailedStation[];
+	durationSecs: string;
+}): void {
+	const failedStr =
+		params.failedStations.length > 0
+			? ` (${params.failedStations.map((f) => `${f.id}: ${f.reason}`).join(", ")})`
+			: "";
+
+	console.log(`
+── Capture Summary ──────────────────────────────────────────
+Timetable Version:    ${params.result.timetable_version}
+Snapshot ID:          ${params.result.snapshot_id} (${params.result.manifest.day_type}, ${params.result.manifest.status})
+Operational Stations: ${params.totalStations}
+Successful Boards:    ${params.successfulBoardsCount}
+Failed Stations:      ${params.failedStations.length}${failedStr}
+Duration:             ${params.durationSecs}s
+Station Master Hash:  ${params.result.manifest.station_master_hash.slice(0, 16)}...
+Board Response Hash:  ${params.result.manifest.board_response_hash.slice(0, 16)}...
+Saved to:             ${params.result.snapshot_dir}
+─────────────────────────────────────────────────────────────
+`);
+}
+
+/**
+ * Executes the full live capture pipeline (§8.1, §8.2).
+ */
+export async function executeCapture(
+	options: CaptureOptions = {},
+): Promise<CaptureResult> {
+	const ctx = resolveCaptureContext(options);
+
+	// 1. Fetch Station Master Catalog & Extract Operational Roster
+	const stationsResponse = await ctx.client.fetchStations();
+	const operationalStations = filterOperationalStations(
+		stationsResponse.data,
+		ctx.regionScope,
+	);
+	const currentStationMasterHash =
+		computeStationMasterHash(operationalStations);
+
+	// 2. Gate 1: Network Station Catalog Gate
+	const gate1 = await evaluateGate1({
+		dataDir: ctx.dataDir,
+		currentStationMasterHash,
+		newVersion: ctx.newVersion,
+		yes: ctx.yes,
+		prompt: ctx.prompt,
+	});
+
+	// 3. Paced Concurrent Board Fan-Out
+	const boardsResult = await fetchDepartureBoards(
+		operationalStations,
+		ctx.client,
+	);
+	const currentBoardResponseHash = computeBoardResponseHash(
+		boardsResult.boardsMap,
+	);
+
+	// 4. Gate 2: Timetable Edition Gate
+	const gate2 = await evaluateGate2({
+		dataDir: ctx.dataDir,
+		versionToUse: gate1.versionToUse,
+		shouldBumpVersion: gate1.shouldBumpVersion,
+		resolvedDayType: ctx.resolvedDayType,
+		currentBoardResponseHash,
+		yes: ctx.yes,
+		prompt: ctx.prompt,
+	});
+
+	// 5. Atomic Disk Persistence
+	const result = await writeSnapshotToDisk({
+		dataDir: ctx.dataDir,
+		versionToUse: gate2.versionToUse,
+		shouldBumpVersion: gate2.shouldBumpVersion,
+		snapshotDate: ctx.snapshotDate,
+		resolvedDayType: ctx.resolvedDayType,
+		regionScope: ctx.regionScope,
+		currentStationMasterHash,
+		currentBoardResponseHash,
+		isDegraded: boardsResult.isDegraded,
+		stationsResponse,
+		rawBoardsMap: boardsResult.rawBoardsMap,
+	});
+
+	// 6. Report Summary
+	printCaptureSummary({
+		result,
+		totalStations: operationalStations.length,
+		successfulBoardsCount: boardsResult.boardsMap.size,
+		failedStations: boardsResult.failedStations,
+		durationSecs: boardsResult.durationSecs,
+	});
+
+	return result;
 }
