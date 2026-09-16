@@ -3,9 +3,9 @@
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
-		"format": "biome format --write",
-		"lint": "biome lint",
-		"check": "biome check",
+		"format": "biome format --write --no-errors-on-unmatched",
+		"lint": "biome lint --no-errors-on-unmatched",
+		"check": "biome check --no-errors-on-unmatched",
 		"test": "bun test",
 		"typecheck": "tsc --noEmit",
 		"smoke": "bun scripts/smoke.ts",
