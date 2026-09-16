@@ -1,14 +1,14 @@
 // scripts/smoke.ts
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import { parseArgs } from "node:util";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import * as z from "zod";
-import fc from "fast-check";
+import { parseArgs } from "node:util";
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import fc from "fast-check";
+import * as z from "zod";
 import { initDb } from "../src/db/connection";
 import * as schema from "../src/db/tables";
 
