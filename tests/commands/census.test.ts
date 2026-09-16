@@ -8,6 +8,7 @@ import type {
 	DepartureBoardResponse,
 } from "../../src/api/schemas";
 import {
+	type DiscoveredTrain,
 	discoverTrainIds,
 	executeCensus,
 	readItineraryEnvelope,
@@ -124,62 +125,57 @@ describe("src/commands/census", () => {
 		expect(train5552?.dest).toBe("CIKARANG");
 	});
 
+	function mockDiscovered(
+		trainId: string,
+		kaName: string,
+		dest: string,
+		stations: string[],
+		routeName?: string,
+	): [string, DiscoveredTrain] {
+		return [
+			trainId,
+			{
+				trainId,
+				kaName,
+				routeName,
+				dest,
+				stations,
+				dayTypes: new Set(["weekday" as const]),
+			},
+		];
+	}
+
 	it("selectStratifiedSample extracts the 5 representative corridor services", async () => {
-		const trains = new Map([
-			[
+		const trains = new Map<string, DiscoveredTrain>([
+			mockDiscovered(
 				"2200",
-				{
-					trainId: "2200",
-					kaName: "Commuter Line Bogor",
-					routeName: "JAKARTA KOTA-BOGOR",
-					dest: "BOGOR",
-					stations: ["JAKK", "MRI", "BOO"],
-					dayTypes: new Set(["weekday" as const]),
-				},
-			],
-			[
+				"Commuter Line Bogor",
+				"BOGOR",
+				["JAKK", "MRI", "BOO"],
+				"JAKARTA KOTA-BOGOR",
+			),
+			mockDiscovered(
 				"5001",
-				{
-					trainId: "5001",
-					kaName: "Commuter Line Cikarang",
-					routeName: "PASAR SENEN-BEKASI",
-					dest: "BEKASI",
-					stations: ["PSE", "BKS"],
-					dayTypes: new Set(["weekday" as const]),
-				},
-			],
-			[
+				"Commuter Line Cikarang",
+				"BEKASI",
+				["PSE", "BKS"],
+				"PASAR SENEN-BEKASI",
+			),
+			mockDiscovered(
 				"4001",
-				{
-					trainId: "4001",
-					kaName: "Commuter Line Loop",
-					routeName: "CIKARANG-KAMPUNG BANDAN LOOP",
-					dest: "KAMPUNG BANDAN",
-					stations: ["KMO", "JNG"],
-					dayTypes: new Set(["weekday" as const]),
-				},
-			],
-			[
+				"Commuter Line Loop",
+				"KAMPUNG BANDAN",
+				["KMO", "JNG"],
+				"CIKARANG-KAMPUNG BANDAN LOOP",
+			),
+			mockDiscovered(
 				"1901",
-				{
-					trainId: "1901",
-					kaName: "Commuter Line Rangkasbitung",
-					routeName: "TANAH ABANG-RANGKASBITUNG",
-					dest: "RANGKASBITUNG",
-					stations: ["THB", "RK"],
-					dayTypes: new Set(["weekday" as const]),
-				},
-			],
-			[
-				"9002F",
-				{
-					trainId: "9002F",
-					kaName: "Commuter Line Fakultatif",
-					dest: "MANGGARAI",
-					stations: ["MRI"],
-					dayTypes: new Set(["weekday" as const]),
-				},
-			],
+				"Commuter Line Rangkasbitung",
+				"RANGKASBITUNG",
+				["THB", "RK"],
+				"TANAH ABANG-RANGKASBITUNG",
+			),
+			mockDiscovered("9002F", "Commuter Line Fakultatif", "MANGGARAI", ["MRI"]),
 		]);
 
 		const sample = selectStratifiedSample(trains);
@@ -222,6 +218,10 @@ describe("src/commands/census", () => {
 		expect(readBack).not.toBeNull();
 		expect(readBack?.train_id).toBe("2200");
 		expect(readBack?.observations.weekday?.stops.length).toBe(1);
+
+		// Corrupted JSON should throw instead of returning null
+		await fs.writeFile(envelopePath, "not valid json {", "utf-8");
+		expect(readItineraryEnvelope(envelopePath)).rejects.toThrow();
 	});
 
 	it("runStratifiedSpotCheck detects hash divergence and permits fakultatif suspension", async () => {
@@ -419,6 +419,84 @@ describe("src/commands/census", () => {
 		expect(env2202?.train_id).toBe("2202");
 		expect(env2202?.observations.weekday?.stops.length).toBe(0);
 		expect(env2202?.observations.weekday?.payload_hash).toBe(payloadHash([]));
+	});
+
+	it("executeCensus enriches existing envelopes across multiple day types", async () => {
+		await setupMockSnapshot(1, 1, "weekday", {
+			MRI: {
+				status: 200,
+				data: [
+					{
+						train_id: "2200",
+						ka_name: "Commuter Line Bogor",
+						route_name: "JAKARTA KOTA-BOGOR",
+						dest: "BOGOR",
+						time_est: "05:00:00",
+						color: "#FF0000",
+						dest_time: "06:15:00",
+					},
+				],
+			},
+		});
+
+		await setupMockSnapshot(1, 2, "saturday", {
+			MRI: {
+				status: 200,
+				data: [
+					{
+						train_id: "2200",
+						ka_name: "Commuter Line Bogor",
+						route_name: "JAKARTA KOTA-BOGOR",
+						dest: "BOGOR",
+						time_est: "05:00:00",
+						color: "#FF0000",
+						dest_time: "06:15:00",
+					},
+				],
+			},
+		});
+
+		const mockFetch: FetchFunction = async () =>
+			new Response(
+				JSON.stringify({
+					status: 200,
+					data: [
+						{
+							train_id: "2200",
+							ka_name: "Commuter Line Bogor",
+							station_id: "MRI",
+							station_name: "MANGGARAI",
+							time_est: "05:00:00",
+							transit_station: false,
+							color: "#FF0000",
+							transit: "",
+						},
+					],
+				}),
+				{ status: 200 },
+			);
+
+		const client = new KciClient({ fetchFn: mockFetch, pacingMs: 0 });
+
+		await executeCensus({
+			client,
+			dataDir: TEST_SCRATCH_DIR,
+			version: 1,
+			dayType: "weekday",
+		});
+
+		await executeCensus({
+			client,
+			dataDir: TEST_SCRATCH_DIR,
+			version: 1,
+			dayType: "saturday",
+		});
+
+		const env = await readItineraryEnvelope(
+			path.join(TEST_SCRATCH_DIR, "1", "itineraries", "2200.json"),
+		);
+		expect(env?.observations.weekday).toBeDefined();
+		expect(env?.observations.saturday).toBeDefined();
 	});
 
 	it("executeCensus fails release gate when target day type lacks a completed snapshot", async () => {

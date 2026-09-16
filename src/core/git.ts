@@ -317,7 +317,7 @@ export async function commitCensus(
 	try {
 		const { stdout: statusOut } = await execFileAsync(
 			"git",
-			["status", "--porcelain", relativeItinerariesDir],
+			["status", "--porcelain", "--", relativeItinerariesDir],
 			{ cwd },
 		);
 		if (!statusOut.trim()) {
@@ -344,7 +344,7 @@ export async function commitCensus(
 	try {
 		const { stdout: stagedBefore } = await execFileAsync(
 			"git",
-			["diff", "--cached", "--name-only"],
+			["diff", "--cached", "--name-only", "--relative"],
 			{ cwd },
 		);
 		const alreadyStaged = stagedBefore.trim().split("\n").filter(Boolean);
@@ -366,7 +366,7 @@ export async function commitCensus(
 
 	// 6. Explicitly stage ONLY the itineraries directory
 	try {
-		await execFileAsync("git", ["add", relativeItinerariesDir], { cwd });
+		await execFileAsync("git", ["add", "--", relativeItinerariesDir], { cwd });
 	} catch (err) {
 		return {
 			committed: false,
@@ -378,7 +378,7 @@ export async function commitCensus(
 	try {
 		const { stdout: stagedAfter } = await execFileAsync(
 			"git",
-			["diff", "--cached", "--name-only"],
+			["diff", "--cached", "--name-only", "--relative"],
 			{ cwd },
 		);
 		const nowStaged = stagedAfter.trim().split("\n").filter(Boolean);
@@ -388,7 +388,7 @@ export async function commitCensus(
 		if (violatingFiles.length > 0) {
 			await execFileAsync(
 				"git",
-				["restore", "--staged", relativeItinerariesDir],
+				["restore", "--staged", "--", relativeItinerariesDir],
 				{ cwd },
 			);
 			return {

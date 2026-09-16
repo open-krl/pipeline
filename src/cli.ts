@@ -296,12 +296,15 @@ List Snapshots Usage:
 			}
 
 			const versionStr = values.version ?? positionals[0];
-			const version = versionStr ? Number.parseInt(versionStr, 10) : undefined;
-			if (version !== undefined && Number.isNaN(version)) {
-				console.error(
-					`Error: Invalid version '${versionStr}'. Must be an integer.`,
-				);
-				process.exit(1);
+			let version: number | undefined;
+			if (versionStr !== undefined) {
+				if (!/^\d+$/.test(versionStr.trim())) {
+					console.error(
+						`Error: Invalid version '${versionStr}'. Must be a positive integer.`,
+					);
+					process.exit(1);
+				}
+				version = Number.parseInt(versionStr, 10);
 			}
 
 			console.log("Starting KRL itinerary census crawl...");

@@ -125,6 +125,18 @@ export async function discoverTrainIds(
 				const parsed = DepartureBoardResponseSchema.parse(JSON.parse(content));
 
 				for (const item of parsed.data) {
+					if (
+						!item.train_id ||
+						typeof item.train_id !== "string" ||
+						item.train_id.includes("..") ||
+						!/^[A-Za-z0-9_/-]+$/.test(item.train_id)
+					) {
+						console.warn(
+							`Warning: Skipping invalid train ID '${item.train_id}' in board ${boardFile}`,
+						);
+						continue;
+					}
+
 					const existing = trains.get(item.train_id);
 					if (existing) {
 						if (!existing.stations.includes(staId)) {
@@ -244,8 +256,24 @@ export function selectStratifiedSample(
 }
 
 /**
+ * Safely resolves the JSON envelope storage path for a train ID.
+ * Replaces forward slashes with '%2F' to ensure flat directory storage,
+ * and guarantees containment within itinerariesDir.
+ */
+export function getItineraryPath(
+	itinerariesDir: string,
+	trainId: string,
+): string {
+	const safeFilename = `${encodeURIComponent(trainId)}.json`;
+	return resolveSafePath(
+		path.join(itinerariesDir, safeFilename),
+		itinerariesDir,
+	);
+}
+
+/**
  * Reads and parses an existing MultiObservationItinerary envelope from disk.
- * Returns null if the file does not exist.
+ * Returns null if the file does not exist (ENOENT). Throws if corrupted or malformed.
  */
 export async function readItineraryEnvelope(
 	filePath: string,
@@ -253,8 +281,18 @@ export async function readItineraryEnvelope(
 	try {
 		const content = await fs.readFile(filePath, "utf-8");
 		return MultiObservationItinerarySchema.parse(JSON.parse(content));
-	} catch {
-		return null;
+	} catch (err) {
+		if (
+			err &&
+			typeof err === "object" &&
+			"code" in err &&
+			(err as { code: string }).code === "ENOENT"
+		) {
+			return null;
+		}
+		throw new Error(
+			`Failed to read or parse itinerary envelope at ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+		);
 	}
 }
 
@@ -295,9 +333,9 @@ export async function runStratifiedSpotCheck(params: {
 	for (const [stratum, train] of Object.entries(params.sample)) {
 		if (!train) continue;
 
-		const itineraryFile = resolveSafePath(
-			path.join(params.itinerariesDir, `${train.trainId}.json`),
+		const itineraryFile = getItineraryPath(
 			params.itinerariesDir,
+			train.trainId,
 		);
 		const existing = await readItineraryEnvelope(itineraryFile);
 		const baselineObs = existing?.observations[baselineDayType];
@@ -373,8 +411,16 @@ export async function executeCensus(
 	// 3. Resolve target day_type and validate that a completed capture exists (§9)
 	let targetDayType = options.dayType;
 	if (!targetDayType) {
-		// Default to the day type of the latest snapshot
-		targetDayType = snapshots[snapshots.length - 1].manifest.day_type;
+		// Default to the day type of the latest *completed* snapshot (§9)
+		const latestComplete = [...snapshots]
+			.reverse()
+			.find((s) => s.manifest.status === "complete");
+		if (!latestComplete) {
+			throw new Error(
+				`Census release gate failed: No completed capture snapshot found under version ${version} in ${safeDataDir}.`,
+			);
+		}
+		targetDayType = latestComplete.manifest.day_type;
 	} else {
 		// If explicitly supplied, validate that a completed capture exists for this day type
 		const completedCapture = snapshots.find(
@@ -410,7 +456,15 @@ export async function executeCensus(
 	// 4. Stratified Spot-Check (Sampling 5 representative corridors when baseline cache exists)
 	let stratifiedCheck: StratifiedCheckResult | undefined;
 	if (targetDayType !== "weekday") {
-		const sample = selectStratifiedSample(discoveredMap);
+		// Sample from weekday baseline so all representative corridor services (including suspended fakultatif) can be spot-checked
+		const baselineTrains = await discoverTrainIds(
+			safeDataDir,
+			version,
+			"weekday",
+		);
+		const sample = selectStratifiedSample(
+			baselineTrains.size > 0 ? baselineTrains : discoveredMap,
+		);
 		stratifiedCheck = await runStratifiedSpotCheck({
 			client,
 			itinerariesDir,
@@ -442,26 +496,27 @@ export async function executeCensus(
 			continue;
 		}
 
-		const itineraryPath = resolveSafePath(
-			path.join(itinerariesDir, `${trainId}.json`),
-			itinerariesDir,
-		);
-		const existing = await readItineraryEnvelope(itineraryPath);
+		try {
+			const itineraryPath = getItineraryPath(itinerariesDir, trainId);
+			const existing = await readItineraryEnvelope(itineraryPath);
 
-		const targetObs = existing?.observations[targetDayType];
-		if (existing && targetObs) {
-			cachedCount++;
-			if (options.onProgress) {
-				options.onProgress({
-					current: cachedCount,
-					total: totalDiscovered,
-					trainId,
-					status: "cached",
-					stopCount: targetObs.stops.length,
-					payloadHash: targetObs.payload_hash,
-				});
+			const targetObs = existing?.observations[targetDayType];
+			if (existing && targetObs) {
+				cachedCount++;
+				if (options.onProgress) {
+					options.onProgress({
+						current: cachedCount,
+						total: totalDiscovered,
+						trainId,
+						status: "cached",
+						stopCount: targetObs.stops.length,
+						payloadHash: targetObs.payload_hash,
+					});
+				}
+			} else {
+				trainsToProbe.push(trainId);
 			}
-		} else {
+		} catch {
 			trainsToProbe.push(trainId);
 		}
 	}
@@ -476,28 +531,25 @@ export async function executeCensus(
 
 	await Promise.all(
 		trainsToProbe.map(async (trainId) => {
-			const itineraryPath = resolveSafePath(
-				path.join(itinerariesDir, `${trainId}.json`),
-				itinerariesDir,
-			);
+			let stops: ItineraryStop[] = [];
+			let hash = "";
+			let status: "ok" | "not_found" = "not_found";
 
 			try {
+				const itineraryPath = getItineraryPath(itinerariesDir, trainId);
 				const response = await client.fetchTrainSchedule(trainId);
-				completedSoFar++;
 
 				const fetchedAt = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
-				let stops: ItineraryStop[] = [];
-				let hash: string;
 
 				if (response?.data && response.data.length > 0) {
 					stops = response.data;
 					hash = payloadHash(stops);
-					successCount++;
+					status = "ok";
 				} else {
 					// 404 / no active schedule
 					stops = [];
 					hash = payloadHash([]);
-					notFoundCount++;
+					status = "not_found";
 				}
 
 				const existing = (await readItineraryEnvelope(itineraryPath)) ?? {
@@ -513,7 +565,14 @@ export async function executeCensus(
 
 				await writeItineraryEnvelope(itineraryPath, existing);
 
-				const status = stops.length > 0 ? "ok" : "not_found";
+				// Outcome counters are updated ONLY after write succeeds
+				if (status === "ok") {
+					successCount++;
+				} else {
+					notFoundCount++;
+				}
+
+				completedSoFar++;
 				if (options.onProgress) {
 					options.onProgress({
 						current: completedSoFar,
