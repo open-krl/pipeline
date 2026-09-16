@@ -5,7 +5,9 @@ pre-commit:
     - name: typecheck
       run: bun run typecheck
     - name: lint
+      glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"  
       run: bun run lint
     - name: format
+      glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"
       run: bun run format {staged_files}
       stage_fixed: true
