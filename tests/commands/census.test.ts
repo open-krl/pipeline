@@ -266,7 +266,7 @@ describe("src/commands/census", () => {
 
 		// Mock client where 2200 has diverged timetable on weekend, and 9002F is suspended (404)
 		const mockFetch: FetchFunction = async (input) => {
-			const urlStr = String(input);
+			const urlStr = input instanceof Request ? input.url : String(input);
 			if (urlStr.includes("trainid=2200")) {
 				return new Response(
 					JSON.stringify({
@@ -284,10 +284,14 @@ describe("src/commands/census", () => {
 			if (urlStr.includes("trainid=9002F")) {
 				return new Response(null, { status: 404 });
 			}
-			return new Response(null, { status: 404 });
+			throw new Error(`Unhandled mock request in spot check: ${urlStr}`);
 		};
 
-		const client = new KciClient({ fetchFn: mockFetch, pacingMs: 0 });
+		const client = new KciClient({
+			fetchFn: mockFetch,
+			pacingMs: 0,
+			retryBaseMs: 1,
+		});
 		const sample = {
 			bogor: {
 				trainId: "2200",
@@ -348,7 +352,7 @@ describe("src/commands/census", () => {
 		let fetchCalls = 0;
 		const mockFetch: FetchFunction = async (input) => {
 			fetchCalls++;
-			const urlStr = String(input);
+			const urlStr = input instanceof Request ? input.url : String(input);
 			if (urlStr.includes("trainid=2200")) {
 				return new Response(
 					JSON.stringify({
@@ -369,11 +373,18 @@ describe("src/commands/census", () => {
 					{ status: 200 },
 				);
 			}
-			// 2202 returns 404
-			return new Response(null, { status: 404 });
+			// 2202 returns 404 (simulating suspended service under test)
+			if (urlStr.includes("trainid=2202")) {
+				return new Response(null, { status: 404 });
+			}
+			throw new Error(`Unhandled mock request in crawl: ${urlStr}`);
 		};
 
-		const client = new KciClient({ fetchFn: mockFetch, pacingMs: 0 });
+		const client = new KciClient({
+			fetchFn: mockFetch,
+			pacingMs: 0,
+			retryBaseMs: 1,
+		});
 
 		// First pass: crawl both trains
 		const result1 = await executeCensus({
@@ -476,7 +487,11 @@ describe("src/commands/census", () => {
 				{ status: 200 },
 			);
 
-		const client = new KciClient({ fetchFn: mockFetch, pacingMs: 0 });
+		const client = new KciClient({
+			fetchFn: mockFetch,
+			pacingMs: 0,
+			retryBaseMs: 1,
+		});
 
 		await executeCensus({
 			client,

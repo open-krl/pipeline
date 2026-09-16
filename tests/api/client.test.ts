@@ -1,5 +1,6 @@
 // tests/api/client.test.ts
 import { describe, expect, it } from "bun:test";
+import { SchemaValidationError } from "ky";
 import {
 	AsyncSemaphore,
 	type FetchFunction,
@@ -55,12 +56,12 @@ describe("src/api/client - KciClient", () => {
 			],
 		};
 
-		let requestedUrl = "";
-		let requestedHeaders: HeadersInit | undefined;
+		let capturedRequest: Request | undefined;
 
-		const mockFetch: FetchFunction = async (input, init) => {
-			requestedUrl = String(input);
-			requestedHeaders = init?.headers;
+		const mockFetch: FetchFunction = async (input) => {
+			if (input instanceof Request) {
+				capturedRequest = input;
+			}
 			return new Response(JSON.stringify(mockStationsData), {
 				status: 200,
 				headers: { "Content-Type": "application/json" },
@@ -78,11 +79,9 @@ describe("src/api/client - KciClient", () => {
 		expect(result.status).toBe(200);
 		expect(result.data.length).toBe(2);
 		expect(result.data[0].sta_id).toBe("MRI");
-		expect(requestedUrl).toBe("https://mock.kci.id/api/krl/stations");
-
-		const headers = requestedHeaders as Record<string, string>;
-		expect(headers["User-Agent"]).toBeDefined();
-		expect(headers.Referer).toBe("https://www.kci.id/");
+		expect(capturedRequest?.url).toBe("https://mock.kci.id/api/krl/stations");
+		expect(capturedRequest?.headers.get("User-Agent")).toBeDefined();
+		expect(capturedRequest?.headers.get("Referer")).toBe("https://www.kci.id/");
 	});
 
 	it("fetches station schedule with default time window", async () => {
@@ -103,7 +102,7 @@ describe("src/api/client - KciClient", () => {
 
 		let requestedUrl = "";
 		const mockFetch: FetchFunction = async (input) => {
-			requestedUrl = String(input);
+			requestedUrl = input instanceof Request ? input.url : String(input);
 			return new Response(JSON.stringify(mockScheduleData), {
 				status: 200,
 				headers: { "Content-Type": "application/json" },
@@ -219,7 +218,7 @@ describe("src/api/client - KciClient", () => {
 			maxRetries: 2,
 		});
 
-		await expect(client.fetchStations()).rejects.toThrow("after 2 retries");
+		await expect(client.fetchStations()).rejects.toThrow("HTTP 500");
 		// initial attempt (0) + 2 retries = 3 calls
 		expect(callCount).toBe(3);
 	});
@@ -248,7 +247,8 @@ describe("src/api/client - KciClient", () => {
 			retryBaseMs: 5,
 		});
 
-		await expect(client.fetchStations()).rejects.toThrow();
+		// .json(schema) throws Ky's SchemaValidationError, which passes through contextualize untouched
+		await expect(client.fetchStations()).rejects.toThrow(SchemaValidationError);
 	});
 
 	it("aborts when fetch exceeds configured timeoutMs", async () => {

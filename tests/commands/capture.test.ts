@@ -94,7 +94,7 @@ describe("src/commands/capture", () => {
 		const booBoard = overrides?.booBoard ?? mockMriBoard;
 
 		const mockFetch = async (input: RequestInfo | URL) => {
-			const url = String(input);
+			const url = input instanceof Request ? input.url : String(input);
 			if (url.includes("/api/krl/stations")) {
 				return new Response(JSON.stringify(stations), {
 					status: 200,
@@ -122,7 +122,7 @@ describe("src/commands/capture", () => {
 					headers: { "Content-Type": "application/json" },
 				});
 			}
-			return new Response("Not Found", { status: 404 });
+			throw new Error(`Unhandled mock request in capture.test.ts: ${url}`);
 		};
 
 		return new KciClient({
