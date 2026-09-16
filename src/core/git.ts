@@ -262,3 +262,176 @@ export async function commitCaptureSnapshot(
 		};
 	}
 }
+
+export interface CommitCensusOptions {
+	dataDir: string;
+	version: number;
+	totalTrips: number;
+	newlyProbed: number;
+	failedCount: number;
+	cwd?: string;
+}
+
+export interface CommitCensusResult {
+	committed: boolean;
+	commitHash?: string;
+	reason?: string;
+	message?: string;
+}
+
+/**
+ * Stages and commits itinerary census raw payloads for a timetable edition to git.
+ */
+export async function commitCensus(
+	options: CommitCensusOptions,
+): Promise<CommitCensusResult> {
+	const cwd = options.cwd ?? process.cwd();
+
+	// 1. Verify Git workspace
+	if (!(await isGitRepository(cwd))) {
+		return {
+			committed: false,
+			reason: "Not inside a Git repository",
+		};
+	}
+
+	// 2. Resolve itineraries directory
+	let resolvedItinerariesDir: string;
+	try {
+		const safeDataDir = resolveSafePath(options.dataDir, cwd);
+		resolvedItinerariesDir = resolveSafePath(
+			path.join(safeDataDir, String(options.version), "itineraries"),
+			cwd,
+		);
+	} catch (err) {
+		return {
+			committed: false,
+			reason: `Invalid itineraries directory: ${err instanceof Error ? err.message : String(err)}`,
+		};
+	}
+
+	// 3. Compute relative path
+	const relativeItinerariesDir = path.relative(cwd, resolvedItinerariesDir);
+
+	// 4. Verify uncommitted changes exist in itineraries directory
+	try {
+		const { stdout: statusOut } = await execFileAsync(
+			"git",
+			["status", "--porcelain", "--", relativeItinerariesDir],
+			{ cwd },
+		);
+		if (!statusOut.trim()) {
+			return {
+				committed: false,
+				reason: "No uncommitted changes in itineraries directory",
+			};
+		}
+	} catch (err) {
+		return {
+			committed: false,
+			reason: `Failed to check git status: ${err instanceof Error ? err.message : String(err)}`,
+		};
+	}
+
+	// 5. Contamination Guard: Ensure no other files are already staged
+	const normalizedItinerariesDir = relativeItinerariesDir
+		.split(path.sep)
+		.join("/");
+	const isInsideItinerariesDir = (file: string) =>
+		file === normalizedItinerariesDir ||
+		file.startsWith(`${normalizedItinerariesDir}/`);
+
+	try {
+		const { stdout: stagedBefore } = await execFileAsync(
+			"git",
+			["diff", "--cached", "--name-only", "--relative"],
+			{ cwd },
+		);
+		const alreadyStaged = stagedBefore.trim().split("\n").filter(Boolean);
+		const unrelatedStaged = alreadyStaged.filter(
+			(file) => !isInsideItinerariesDir(file),
+		);
+		if (unrelatedStaged.length > 0) {
+			return {
+				committed: false,
+				reason: `Staging area contains ${unrelatedStaged.length} unrelated staged file(s) (${unrelatedStaged.slice(0, 3).join(", ")}...). Unstage them first.`,
+			};
+		}
+	} catch (err) {
+		return {
+			committed: false,
+			reason: `Failed to check staged files: ${err instanceof Error ? err.message : String(err)}`,
+		};
+	}
+
+	// 6. Explicitly stage ONLY the itineraries directory
+	try {
+		await execFileAsync("git", ["add", "--", relativeItinerariesDir], { cwd });
+	} catch (err) {
+		return {
+			committed: false,
+			reason: `Failed to stage itineraries directory: ${err instanceof Error ? err.message : String(err)}`,
+		};
+	}
+
+	// 7. Audit staged set post-add
+	try {
+		const { stdout: stagedAfter } = await execFileAsync(
+			"git",
+			["diff", "--cached", "--name-only", "--relative"],
+			{ cwd },
+		);
+		const nowStaged = stagedAfter.trim().split("\n").filter(Boolean);
+		const violatingFiles = nowStaged.filter(
+			(file) => !isInsideItinerariesDir(file),
+		);
+		if (violatingFiles.length > 0) {
+			await execFileAsync(
+				"git",
+				["restore", "--staged", "--", relativeItinerariesDir],
+				{ cwd },
+			);
+			return {
+				committed: false,
+				reason: `Contamination guard triggered: found staged files outside itineraries directory (${violatingFiles.slice(0, 3).join(", ")}). Staging rolled back.`,
+			};
+		}
+	} catch (err) {
+		return {
+			committed: false,
+			reason: `Failed to verify staged diff: ${err instanceof Error ? err.message : String(err)}`,
+		};
+	}
+
+	// 8. Commit
+	const commitMessage = formatCensusCommitMessage({
+		timetableVersion: options.version,
+		totalTrips: options.totalTrips,
+		newlyProbed: options.newlyProbed,
+		failedCount: options.failedCount,
+	});
+
+	try {
+		await execFileAsync("git", ["commit", "-m", commitMessage], { cwd });
+		const commitHash = await getGitCommitHash("HEAD", cwd);
+		return {
+			committed: true,
+			commitHash: commitHash ?? undefined,
+			message: commitMessage,
+		};
+	} catch (err) {
+		try {
+			await execFileAsync(
+				"git",
+				["restore", "--staged", relativeItinerariesDir],
+				{ cwd },
+			);
+		} catch {
+			// Ignore unstage error
+		}
+		return {
+			committed: false,
+			reason: `Git commit failed: ${err instanceof Error ? err.message : String(err)}`,
+		};
+	}
+}
