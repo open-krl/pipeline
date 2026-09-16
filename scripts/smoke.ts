@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseArgs } from "node:util";
+import { cac } from "cac";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import fc from "fast-check";
@@ -175,18 +175,21 @@ await check("fast-check 4 — assert/property/integer surface", async () => {
 	);
 });
 
-await check("node:util parseArgs — CLI parsing", () => {
-	const args = parseArgs({
-		args: ["--day-type", "sunday", "--reprobe-all"],
-		options: {
-			"day-type": { type: "string" },
-			"reprobe-all": { type: "boolean" },
-		},
-		strict: true,
-	});
+await check("cac 7 — CLI command registration and option parsing", () => {
+	const cli = cac("krl");
+	cli
+		.command("census [version]")
+		.option("--day-type <type>", "Target day type")
+		.option("--reprobe-all", "Reprobe all");
+	const parsed = cli.parse(
+		["bun", "cli.ts", "census", "1", "--day-type", "sunday", "--reprobe-all"],
+		{ run: false },
+	);
 	expect(
-		args.values["day-type"] === "sunday" && args.values["reprobe-all"] === true,
-		"parseArgs shape unexpected",
+		parsed.args[0] === "1" &&
+			parsed.options.dayType === "sunday" &&
+			parsed.options.reprobeAll === true,
+		"cac parsed options unexpected",
 	);
 });
 

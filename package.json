@@ -13,6 +13,7 @@
 		"fetch:holidays": "bun scripts/fetch-holidays.ts"
 	},
 	"dependencies": {
+		"cac": "^7.0.0",
 		"drizzle-orm": "^1.0.0-rc.4",
 		"zod": "^4"
 	},

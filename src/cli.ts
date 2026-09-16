@@ -2,7 +2,7 @@
 // src/cli.ts
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
-import { parseArgs } from "node:util";
+import { cac } from "cac";
 import { type DayType, DayTypeSchema } from "./api/schemas";
 import {
 	executeCapture,
@@ -15,308 +15,324 @@ import { type RegionScope, RegionScopeSchema } from "./config";
 import { commitCaptureSnapshot } from "./core/git";
 import { resolveSafePath } from "./core/path";
 
-async function main() {
-	const args = process.argv.slice(2);
-	const command = args[0];
+export function createCli() {
+	const cli = cac("krl");
 
-	if (!command || command === "--help" || command === "-h") {
-		console.log(`
-KRL Schedule Pipeline CLI
-
-Usage:
-  bun src/cli.ts <command> [options]
-
-Commands:
-  capture          Fetch station catalog & boards with version gating (§8.1)
-  commit-snapshot  Commit a raw capture snapshot to git repository
-  list-snapshots   List captured timetable snapshots and their git archive status
-  census           Crawl complete itineraries for newly discovered trips (§8.3)
-  build            Compile SQLite database, resolve services & presence (§10)
-  export           Generate standard GTFS feeds (§11)
-  calendar         Update statutory holiday definitions (§10.2)
-  detect           Probe corridor hubs for timetable drift (§12)
-
-Capture Options:
-  --day-type <type>    Force day type (weekday, saturday, sunday, holiday)
-  --region <region>    Region scope (jabodetabek, yogyakarta, all) [default: jabodetabek]
-  --new-version        Force bumping to next timetable version (<version + 1>)
-  --yes                Non-interactive execution (fails on gate alerts)
-  --data-dir <path>    Override raw data root directory [default: data/raw]
-  --commit             Automatically commit captured snapshot to git
-  --no-commit          Skip committing snapshot to git
-
-Census Options:
-  --day-type <type>    Target day type (weekday, saturday, sunday, holiday)
-  --reprobe-all        Force reprobe all active trains for day type
-  --version <number>   Specific timetable version [default: latest]
-  --data-dir <path>    Override raw data root directory [default: data/raw]
-  --commit             Automatically commit captured itineraries to git
-
-Commit Snapshot Usage:
-  bun src/cli.ts commit-snapshot [version] [snapshot_id] [--data-dir <path>]
-
-List Snapshots Usage:
-  bun src/cli.ts list-snapshots [version] [--data-dir <path>]
-`);
-		process.exit(0);
-	}
-
-	switch (command) {
-		case "capture": {
-			const { values } = parseArgs({
-				args: args.slice(1),
-				options: {
-					"day-type": { type: "string" },
-					region: { type: "string" },
-					"new-version": { type: "boolean", default: false },
-					yes: { type: "boolean", default: false },
-					"data-dir": { type: "string" },
-					commit: { type: "boolean", default: false },
-					"no-commit": { type: "boolean", default: false },
-				},
-				allowPositionals: false,
-			});
-
-			let dayType: DayType | undefined;
-			if (values["day-type"]) {
-				const res = DayTypeSchema.safeParse(values["day-type"]);
-				if (!res.success) {
-					console.error(
-						`Error: Invalid --day-type '${values["day-type"]}'. Allowed values: ${Object.values(DayTypeSchema.enum).join(", ")}`,
-					);
-					process.exit(1);
-				}
-				dayType = res.data;
-			}
-
-			let region: RegionScope | undefined;
-			if (values.region) {
-				const res = RegionScopeSchema.safeParse(values.region);
-				if (!res.success) {
-					console.error(
-						`Error: Invalid --region '${values.region}'. Allowed values: ${Object.values(RegionScopeSchema.enum).join(", ")}`,
-					);
-					process.exit(1);
-				}
-				region = res.data;
-			}
-
-			const newVersion = values["new-version"];
-			const yes = values.yes;
-			let dataDir: string | undefined;
-			if (values["data-dir"]) {
-				try {
-					dataDir = resolveSafePath(values["data-dir"]);
-				} catch (err) {
-					console.error(
-						`Error: ${err instanceof Error ? err.message : String(err)}`,
-					);
-					process.exit(1);
-				}
-			}
-			const commit = values.commit ? true : undefined;
-			const noCommit = values["no-commit"];
-
-			console.log("Starting KRL schedule capture pipeline...");
-			const result = await executeCapture({
-				dayType,
-				region,
-				newVersion,
-				yes,
-				dataDir,
-				commit,
-				noCommit,
-			});
-
-			console.log(
-				`Capture successful: version ${result.timetable_version}, snapshot ${result.snapshot_id} (${result.manifest.day_type}, ${result.manifest.status})`,
-			);
-			console.log(`Saved snapshot to: ${result.snapshot_dir}`);
-
-			if (!commit && !noCommit && process.stdin.isTTY && !yes) {
-				const rl = readline.createInterface({
-					input: process.stdin,
-					output: process.stdout,
-				});
-				try {
-					const ans = await rl.question(
-						"\nCommit snapshot to git repository? [Y/n] ",
-					);
-					const trimmed = ans.trim().toLowerCase();
-					if (trimmed === "" || trimmed === "y" || trimmed === "yes") {
-						const commitResult = await commitCaptureSnapshot({
-							snapshotDir: result.snapshot_dir,
-							manifest: result.manifest,
-						});
-						if (commitResult.committed) {
-							console.log(
-								`[Git] Committed snapshot to git: ${commitResult.commitHash?.slice(0, 7)}`,
-							);
-						} else {
-							console.warn(
-								`[Git] Notice: Snapshot not committed: ${commitResult.reason}`,
-							);
-						}
+	// 1. capture
+	cli
+		.command(
+			"capture",
+			"Fetch station catalog & boards with version gating (§8.1)",
+		)
+		.option(
+			"--day-type <type>",
+			"Force day type (weekday, saturday, sunday, holiday)",
+		)
+		.option(
+			"--region <region>",
+			"Region scope (jabodetabek, yogyakarta, all)",
+			{
+				default: "jabodetabek",
+			},
+		)
+		.option(
+			"--new-version",
+			"Force bumping to next timetable version (<version + 1>)",
+		)
+		.option("--yes", "Non-interactive execution (fails on gate alerts)")
+		.option("--data-dir <path>", "Override raw data root directory", {
+			default: "data/raw",
+		})
+		.option(
+			"--commit",
+			"Automatically commit captured snapshot to git (use --no-commit to skip)",
+		)
+		.action(
+			async (options: {
+				dayType?: string;
+				region?: string;
+				newVersion?: boolean;
+				yes?: boolean;
+				dataDir?: string;
+				commit?: boolean;
+			}) => {
+				let dayType: DayType | undefined;
+				if (options.dayType) {
+					const res = DayTypeSchema.safeParse(options.dayType);
+					if (!res.success) {
+						console.error(
+							`Error: Invalid --day-type '${options.dayType}'. Allowed values: ${Object.values(DayTypeSchema.enum).join(", ")}`,
+						);
+						process.exit(1);
 					}
-				} finally {
-					rl.close();
+					dayType = res.data;
 				}
-			}
-			break;
-		}
 
-		case "commit-snapshot": {
-			const { values, positionals } = parseArgs({
-				args: args.slice(1),
-				options: {
-					"data-dir": { type: "string" },
-				},
-				allowPositionals: true,
-			});
-
-			let dataDir: string;
-			try {
-				dataDir = resolveSafePath(values["data-dir"] ?? "data/raw");
-			} catch (err) {
-				console.error(
-					`Error: ${err instanceof Error ? err.message : String(err)}`,
-				);
-				process.exit(1);
-			}
-			let version: number;
-			let snapshotId: number;
-
-			if (positionals.length >= 2) {
-				version = Number.parseInt(positionals[0], 10);
-				snapshotId = Number.parseInt(positionals[1], 10);
-			} else {
-				// Detect latest version & snapshot
-				const versions = await scanTimetableVersions(dataDir);
-				if (versions.length === 0) {
-					console.error(`No timetable versions found in ${dataDir}`);
-					process.exit(1);
+				let region: RegionScope | undefined;
+				if (options.region) {
+					const res = RegionScopeSchema.safeParse(options.region);
+					if (!res.success) {
+						console.error(
+							`Error: Invalid --region '${options.region}'. Allowed values: ${Object.values(RegionScopeSchema.enum).join(", ")}`,
+						);
+						process.exit(1);
+					}
+					region = res.data;
 				}
-				version = versions[versions.length - 1];
-				const snapshots = await scanSnapshots(dataDir, version);
-				if (snapshots.length === 0) {
-					console.error(
-						`No snapshots found under version ${version} in ${dataDir}`,
-					);
-					process.exit(1);
+
+				const newVersion = options.newVersion;
+				const yes = options.yes;
+				let dataDir: string | undefined;
+				if (options.dataDir) {
+					try {
+						dataDir = resolveSafePath(options.dataDir);
+					} catch (err) {
+						console.error(
+							`Error: ${err instanceof Error ? err.message : String(err)}`,
+						);
+						process.exit(1);
+					}
 				}
-				snapshotId = snapshots[snapshots.length - 1].id;
-			}
 
-			const snapshotDir = path.join(
-				dataDir,
-				String(version),
-				"captures",
-				String(snapshotId),
-			);
-			console.log(`Committing snapshot at: ${snapshotDir}`);
-			const commitResult = await commitCaptureSnapshot({ snapshotDir });
+				const commit = options.commit === true ? true : undefined;
+				const noCommit = options.commit === false;
 
-			if (commitResult.committed) {
-				console.log(
-					`Successfully committed snapshot: ${commitResult.commitHash?.slice(0, 7)}`,
-				);
-			} else {
-				console.error(`Commit failed: ${commitResult.reason}`);
-				process.exit(1);
-			}
-			break;
-		}
-
-		case "list-snapshots": {
-			const { values, positionals } = parseArgs({
-				args: args.slice(1),
-				options: {
-					"data-dir": { type: "string" },
-				},
-				allowPositionals: true,
-			});
-
-			let dataDir: string | undefined;
-			if (values["data-dir"]) {
-				try {
-					dataDir = resolveSafePath(values["data-dir"]);
-				} catch (err) {
-					console.error(
-						`Error: ${err instanceof Error ? err.message : String(err)}`,
-					);
-					process.exit(1);
-				}
-			}
-			const version =
-				positionals.length > 0
-					? Number.parseInt(positionals[0], 10)
-					: undefined;
-
-			const entries = await getSnapshotList({ dataDir, version });
-			console.log(`\n${formatSnapshotTable(entries)}\n`);
-			break;
-		}
-
-		case "census": {
-			const { values, positionals } = parseArgs({
-				args: args.slice(1),
-				options: {
-					"day-type": { type: "string" },
-					"reprobe-all": { type: "boolean", default: false },
-					version: { type: "string" },
-					"data-dir": { type: "string" },
-					commit: { type: "boolean", default: false },
-				},
-				allowPositionals: true,
-			});
-
-			let dayType: DayType | undefined;
-			if (values["day-type"]) {
-				const res = DayTypeSchema.safeParse(values["day-type"]);
-				if (!res.success) {
-					console.error(
-						`Error: Invalid --day-type '${values["day-type"]}'. Allowed values: ${Object.values(DayTypeSchema.enum).join(", ")}`,
-					);
-					process.exit(1);
-				}
-				dayType = res.data;
-			}
-
-			let dataDir: string | undefined;
-			if (values["data-dir"]) {
-				try {
-					dataDir = resolveSafePath(values["data-dir"]);
-				} catch (err) {
-					console.error(
-						`Error: ${err instanceof Error ? err.message : String(err)}`,
-					);
-					process.exit(1);
-				}
-			}
-
-			const versionStr = values.version ?? positionals[0];
-			let version: number | undefined;
-			if (versionStr !== undefined) {
-				if (!/^\d+$/.test(versionStr.trim())) {
-					console.error(
-						`Error: Invalid version '${versionStr}'. Must be a positive integer.`,
-					);
-					process.exit(1);
-				}
-				version = Number.parseInt(versionStr, 10);
-			}
-
-			console.log("Starting KRL itinerary census crawl...");
-			try {
-				const result = await executeCensus({
+				console.log("Starting KRL schedule capture pipeline...");
+				const result = await executeCapture({
 					dayType,
-					reprobeAll: values["reprobe-all"],
-					version,
+					region,
+					newVersion,
+					yes,
 					dataDir,
-					commit: values.commit,
+					commit,
+					noCommit,
 				});
 
-				console.log(`
+				console.log(
+					`Capture successful: version ${result.timetable_version}, snapshot ${result.snapshot_id} (${result.manifest.day_type}, ${result.manifest.status})`,
+				);
+				console.log(`Saved snapshot to: ${result.snapshot_dir}`);
+
+				if (!commit && !noCommit && process.stdin.isTTY && !yes) {
+					const rl = readline.createInterface({
+						input: process.stdin,
+						output: process.stdout,
+					});
+					try {
+						const ans = await rl.question(
+							"\nCommit snapshot to git repository? [Y/n] ",
+						);
+						const trimmed = ans.trim().toLowerCase();
+						if (trimmed === "" || trimmed === "y" || trimmed === "yes") {
+							const commitResult = await commitCaptureSnapshot({
+								snapshotDir: result.snapshot_dir,
+								manifest: result.manifest,
+							});
+							if (commitResult.committed) {
+								console.log(
+									`[Git] Committed snapshot to git: ${commitResult.commitHash?.slice(0, 7)}`,
+								);
+							} else {
+								console.warn(
+									`[Git] Notice: Snapshot not committed: ${commitResult.reason}`,
+								);
+							}
+						}
+					} finally {
+						rl.close();
+					}
+				}
+			},
+		);
+
+	// 2. commit-snapshot
+	cli
+		.command(
+			"commit-snapshot [version] [snapshotId]",
+			"Commit a raw capture snapshot to git repository",
+		)
+		.option("--data-dir <path>", "Override raw data root directory", {
+			default: "data/raw",
+		})
+		.action(
+			async (
+				versionArg: string | undefined,
+				snapshotIdArg: string | undefined,
+				options: { dataDir?: string },
+			) => {
+				let dataDir: string;
+				try {
+					dataDir = resolveSafePath(options.dataDir ?? "data/raw");
+				} catch (err) {
+					console.error(
+						`Error: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+				let version: number;
+				let snapshotId: number;
+
+				if (versionArg !== undefined && snapshotIdArg !== undefined) {
+					if (!/^\d+$/.test(versionArg) || !/^\d+$/.test(snapshotIdArg)) {
+						console.error(
+							"Error: version and snapshotId must be positive integers",
+						);
+						process.exit(1);
+					}
+					version = Number.parseInt(versionArg, 10);
+					snapshotId = Number.parseInt(snapshotIdArg, 10);
+				} else {
+					// Detect latest version & snapshot
+					const versions = await scanTimetableVersions(dataDir);
+					if (versions.length === 0) {
+						console.error(`No timetable versions found in ${dataDir}`);
+						process.exit(1);
+					}
+					version = versions[versions.length - 1];
+					const snapshots = await scanSnapshots(dataDir, version);
+					if (snapshots.length === 0) {
+						console.error(
+							`No snapshots found under version ${version} in ${dataDir}`,
+						);
+						process.exit(1);
+					}
+					snapshotId = snapshots[snapshots.length - 1].id;
+				}
+
+				const snapshotDir = path.join(
+					dataDir,
+					String(version),
+					"captures",
+					String(snapshotId),
+				);
+				console.log(`Committing snapshot at: ${snapshotDir}`);
+				const commitResult = await commitCaptureSnapshot({ snapshotDir });
+
+				if (commitResult.committed) {
+					console.log(
+						`Successfully committed snapshot: ${commitResult.commitHash?.slice(0, 7)}`,
+					);
+				} else {
+					console.error(`Commit failed: ${commitResult.reason}`);
+					process.exit(1);
+				}
+			},
+		);
+
+	// 3. list-snapshots
+	cli
+		.command(
+			"list-snapshots [version]",
+			"List captured timetable snapshots and their git archive status",
+		)
+		.option("--data-dir <path>", "Override raw data root directory")
+		.action(
+			async (versionArg: string | undefined, options: { dataDir?: string }) => {
+				let dataDir: string | undefined;
+				if (options.dataDir) {
+					try {
+						dataDir = resolveSafePath(options.dataDir);
+					} catch (err) {
+						console.error(
+							`Error: ${err instanceof Error ? err.message : String(err)}`,
+						);
+						process.exit(1);
+					}
+				}
+				let version: number | undefined;
+				if (versionArg !== undefined) {
+					if (!/^\d+$/.test(versionArg)) {
+						console.error(
+							`Error: Invalid version '${versionArg}'. Must be a positive integer.`,
+						);
+						process.exit(1);
+					}
+					version = Number.parseInt(versionArg, 10);
+				}
+
+				const entries = await getSnapshotList({ dataDir, version });
+				console.log(`\n${formatSnapshotTable(entries)}\n`);
+			},
+		);
+
+	// 4. census
+	cli
+		.command(
+			"census [version]",
+			"Crawl complete itineraries for newly discovered trips (§8.3)",
+		)
+		.option(
+			"--day-type <type>",
+			"Target day type (weekday, saturday, sunday, holiday)",
+		)
+		.option("--reprobe-all", "Force reprobe all active trains for day type")
+		.option(
+			"--timetable-version <number>",
+			"Specific timetable version (alternative to [version])",
+		)
+		.option("--data-dir <path>", "Override raw data root directory")
+		.option("--commit", "Automatically commit captured itineraries to git")
+		.action(
+			async (
+				versionArg: string | undefined,
+				options: {
+					dayType?: string;
+					reprobeAll?: boolean;
+					timetableVersion?: string | number;
+					dataDir?: string;
+					commit?: boolean;
+				},
+			) => {
+				let dayType: DayType | undefined;
+				if (options.dayType) {
+					const res = DayTypeSchema.safeParse(options.dayType);
+					if (!res.success) {
+						console.error(
+							`Error: Invalid --day-type '${options.dayType}'. Allowed values: ${Object.values(DayTypeSchema.enum).join(", ")}`,
+						);
+						process.exit(1);
+					}
+					dayType = res.data;
+				}
+
+				let dataDir: string | undefined;
+				if (options.dataDir) {
+					try {
+						dataDir = resolveSafePath(options.dataDir);
+					} catch (err) {
+						console.error(
+							`Error: ${err instanceof Error ? err.message : String(err)}`,
+						);
+						process.exit(1);
+					}
+				}
+
+				const versionStr =
+					options.timetableVersion !== undefined
+						? String(options.timetableVersion)
+						: versionArg;
+				let version: number | undefined;
+				if (versionStr !== undefined) {
+					if (!/^\d+$/.test(versionStr.trim())) {
+						console.error(
+							`Error: Invalid version '${versionStr}'. Must be a positive integer.`,
+						);
+						process.exit(1);
+					}
+					version = Number.parseInt(versionStr, 10);
+				}
+
+				console.log("Starting KRL itinerary census crawl...");
+				try {
+					const result = await executeCensus({
+						dayType,
+						reprobeAll: Boolean(options.reprobeAll),
+						version,
+						dataDir,
+						commit: Boolean(options.commit),
+					});
+
+					console.log(`
 ── Census Summary ───────────────────────────────────────────
 Timetable Version:  ${result.version}
 Day Type:           ${result.dayType}
@@ -327,45 +343,88 @@ Failed / Errors:    ${result.failedCount} trains
 Duration:           ${result.durationSecs}s
 ─────────────────────────────────────────────────────────────
 `);
-				if (result.commitResult) {
-					if (result.commitResult.committed) {
-						console.log(
-							`Committed census itineraries: ${result.commitResult.commitHash?.slice(0, 7)}`,
-						);
-					} else {
-						console.log(`Git commit skipped: ${result.commitResult.reason}`);
+					if (result.commitResult) {
+						if (result.commitResult.committed) {
+							console.log(
+								`Committed census itineraries: ${result.commitResult.commitHash?.slice(0, 7)}`,
+							);
+						} else {
+							console.log(`Git commit skipped: ${result.commitResult.reason}`);
+						}
 					}
+				} catch (err) {
+					console.error(
+						`Census failed: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
 				}
-			} catch (err) {
+			},
+		);
+
+	// 5. Future milestones
+	const upcomingCommands = [
+		{
+			name: "build",
+			desc: "Compile SQLite database, resolve services & presence (§10)",
+		},
+		{
+			name: "export",
+			desc: "Generate standard GTFS feeds (§11)",
+		},
+		{
+			name: "calendar",
+			desc: "Update statutory holiday definitions (§10.2)",
+		},
+		{
+			name: "detect",
+			desc: "Probe corridor hubs for timetable drift (§12)",
+		},
+	];
+
+	for (const { name, desc } of upcomingCommands) {
+		cli.command(name, desc).action(() => {
+			console.log(
+				`Command '${name}' will be implemented in upcoming milestone.`,
+			);
+		});
+	}
+
+	cli.help();
+	cli.version("0.1.0");
+
+	return cli;
+}
+
+export async function runCli(argv = process.argv) {
+	const cli = createCli();
+	try {
+		cli.parse(argv, { run: false });
+
+		if (cli.options.help || cli.options.version) {
+			return;
+		}
+
+		if (!cli.matchedCommand) {
+			if (cli.args.length > 0) {
 				console.error(
-					`Census failed: ${err instanceof Error ? err.message : String(err)}`,
+					`Unknown command: '${cli.args[0]}'. Use --help for usage.`,
 				);
 				process.exit(1);
+			} else {
+				cli.outputHelp();
+				process.exit(0);
 			}
-			break;
 		}
 
-		case "build":
-		case "export":
-		case "calendar":
-		case "detect": {
-			console.log(
-				`Command '${command}' will be implemented in upcoming milestone.`,
-			);
-			break;
-		}
-
-		default: {
-			console.error(`Unknown command: '${command}'. Use --help for usage.`);
-			process.exit(1);
-		}
+		await cli.runMatchedCommand();
+	} catch (error) {
+		console.error(
+			`Error: ${error instanceof Error ? error.message : String(error)}`,
+		);
+		process.exit(1);
 	}
 }
 
-main().catch((err) => {
-	console.error(
-		"Error executing command:",
-		err instanceof Error ? err.message : err,
-	);
-	process.exit(1);
-});
+if (import.meta.main) {
+	runCli();
+}
