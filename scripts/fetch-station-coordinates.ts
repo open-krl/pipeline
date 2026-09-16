@@ -65,7 +65,7 @@ async function main() {
 		const parts = row.split(",");
 		if (parts.length < 6) continue;
 
-		const [id, name, railwayRef, ref, lat, lon] = parts;
+		const [, name, railwayRef, ref, lat, lon] = parts;
 
 		// Resolve station code
 		let code = railwayRef || ref || NAME_OVERRIDES[name] || "";
