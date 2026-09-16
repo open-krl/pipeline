@@ -9,6 +9,7 @@ import {
 	scanSnapshots,
 	scanTimetableVersions,
 } from "./commands/capture";
+import { formatSnapshotTable, getSnapshotList } from "./commands/snapshots";
 import type { RegionScope } from "./config";
 import { commitCaptureSnapshot } from "./core/git";
 
@@ -26,6 +27,7 @@ Usage:
 Commands:
   capture          Fetch station catalog & boards with version gating (§8.1)
   commit-snapshot  Commit a raw capture snapshot to git repository
+  list-snapshots   List captured timetable snapshots and their git archive status
   census           Crawl complete itineraries for newly discovered trips (§8.3)
   build            Compile SQLite database, resolve services & presence (§10)
   export           Generate standard GTFS feeds (§11)
@@ -43,6 +45,9 @@ Capture Options:
 
 Commit Snapshot Usage:
   bun src/cli.ts commit-snapshot [version] [snapshot_id] [--data-dir <path>]
+
+List Snapshots Usage:
+  bun src/cli.ts list-snapshots [version] [--data-dir <path>]
 `);
 		process.exit(0);
 	}
@@ -171,6 +176,26 @@ Commit Snapshot Usage:
 				console.error(`Commit failed: ${commitResult.reason}`);
 				process.exit(1);
 			}
+			break;
+		}
+
+		case "list-snapshots": {
+			const { values, positionals } = parseArgs({
+				args: args.slice(1),
+				options: {
+					"data-dir": { type: "string" },
+				},
+				allowPositionals: true,
+			});
+
+			const dataDir = values["data-dir"];
+			const version =
+				positionals.length > 0
+					? Number.parseInt(positionals[0], 10)
+					: undefined;
+
+			const entries = await getSnapshotList({ dataDir, version });
+			console.log(`\n${formatSnapshotTable(entries)}\n`);
 			break;
 		}
 
