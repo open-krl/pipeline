@@ -343,4 +343,36 @@ describe("src/commands/capture", () => {
 		);
 		expect(JSON.parse(bksBoardFile).data[0].train_id).toBe("5198C");
 	});
+
+	it("Gate 2 ignores degraded snapshots as baseline comparison", async () => {
+		// Snapshot 1: degraded capture (MRI fails)
+		const client1 = createMockClient({ failStation: "MRI" });
+		const result1 = await executeCapture({
+			client: client1,
+			dataDir: TEST_SCRATCH_DIR,
+			dayType: "weekday",
+		});
+		expect(result1.manifest.status).toBe("degraded");
+		expect(result1.timetable_version).toBe(1);
+		expect(result1.snapshot_id).toBe(1);
+
+		// Snapshot 2: complete capture (both MRI and BKS succeed)
+		// Gate 2 must NOT compare against degraded snapshot 1, so it shouldn't alert/prompt
+		let promptCalled = false;
+		const client2 = createMockClient();
+		const result2 = await executeCapture({
+			client: client2,
+			dataDir: TEST_SCRATCH_DIR,
+			dayType: "weekday",
+			promptFn: async () => {
+				promptCalled = true;
+				return false;
+			},
+		});
+
+		expect(promptCalled).toBe(false);
+		expect(result2.manifest.status).toBe("complete");
+		expect(result2.timetable_version).toBe(1);
+		expect(result2.snapshot_id).toBe(2);
+	});
 });

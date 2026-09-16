@@ -364,7 +364,9 @@ export async function evaluateGate2(params: Gate2Params): Promise<Gate2Result> {
 		params.versionToUse,
 	);
 	const sameDayTypeSnapshot = existingSnapshots.find(
-		(s) => s.manifest.day_type === params.resolvedDayType,
+		(s) =>
+			s.manifest.day_type === params.resolvedDayType &&
+			s.manifest.status === "complete",
 	);
 
 	if (sameDayTypeSnapshot) {
