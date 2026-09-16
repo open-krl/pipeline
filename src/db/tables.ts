@@ -1,3 +1,17 @@
+/**
+ * src/db/tables.ts - Typed Drizzle ORM Schema Mirror
+ *
+ * ARCHITECTURAL NOTE:
+ * The canonical source of truth for the database schema is db/schema.sql (per Section 10).
+ * Runtime database-level invariants (SQLite STRICT mode, table-level CHECK constraints,
+ * WAL journaling, and foreign keys) are enforced directly by SQLite via db/schema.sql
+ * during initDb().
+ *
+ * This file serves strictly as a compile-time TypeScript type mirror for Drizzle ORM query
+ * building. Constraints (CHECK clauses, strict enforcement) are intentionally omitted here
+ * to prevent drift between two sources of truth.
+ */
+
 import {
 	index,
 	integer,
