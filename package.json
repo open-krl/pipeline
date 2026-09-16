@@ -1,0 +1,22 @@
+{
+  "name": "krl-schedule-pipeline",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "smoke": "bun scripts/smoke.ts",
+    "analyze:fixtures": "bun scripts/analyze-fixtures.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^1.0.0-rc.4",
+    "zod": "^4"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "@types/node": "^22.20.3",
+    "drizzle-kit": "^1.0.0-rc.4",
+    "fast-check": "^4",
+    "typescript": "^7.0.2"
+  }
+}
