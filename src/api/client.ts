@@ -4,6 +4,7 @@ import {
 	API_HEADERS,
 	CONCURRENCY,
 	DEFAULT_TIME_WINDOW,
+	PACING_MS,
 	RETRY,
 } from "../config";
 import {
@@ -77,6 +78,7 @@ export interface KciClientOptions {
 	fetchFn?: FetchFunction;
 	boardConcurrency?: number;
 	censusConcurrency?: number;
+	pacingMs?: number;
 	retryBaseMs?: number;
 	retryFactor?: number;
 	maxRetries?: number;
@@ -93,6 +95,7 @@ export class KciClient {
 	readonly fetchFn: FetchFunction;
 	readonly boardSemaphore: AsyncSemaphore;
 	readonly censusSemaphore: AsyncSemaphore;
+	readonly pacingMs: number;
 	readonly retryBaseMs: number;
 	readonly retryFactor: number;
 	readonly maxRetries: number;
@@ -106,6 +109,7 @@ export class KciClient {
 		this.censusSemaphore = new AsyncSemaphore(
 			options.censusConcurrency ?? CONCURRENCY.censusItineraries,
 		);
+		this.pacingMs = options.pacingMs ?? PACING_MS;
 		this.retryBaseMs = options.retryBaseMs ?? RETRY.baseMs;
 		this.retryFactor = options.retryFactor ?? RETRY.factor;
 		this.maxRetries = options.maxRetries ?? RETRY.maxRetries;
@@ -146,6 +150,9 @@ export class KciClient {
 							delayMs = parsedSeconds * 1000;
 						}
 					}
+					console.warn(
+						`[RATE LIMIT] 429 on ${url} - backing off for ${delayMs}ms (attempt ${attempt + 1}/${this.maxRetries})...`,
+					);
 					await sleep(delayMs);
 					continue;
 				}
@@ -161,6 +168,9 @@ export class KciClient {
 						this.retryBaseMs *
 							this.retryFactor ** attempt *
 							(0.8 + 0.4 * Math.random()),
+					);
+					console.warn(
+						`[SERVER ERROR ${response.status}] on ${url} - retrying in ${delayMs}ms (attempt ${attempt + 1}/${this.maxRetries})...`,
 					);
 					await sleep(delayMs);
 					continue;
@@ -191,6 +201,9 @@ export class KciClient {
 					this.retryBaseMs *
 						this.retryFactor ** attempt *
 						(0.8 + 0.4 * Math.random()),
+				);
+				console.warn(
+					`[NETWORK ERROR] ${err instanceof Error ? err.message : String(err)} on ${url} - retrying in ${delayMs}ms (attempt ${attempt + 1}/${this.maxRetries})...`,
 				);
 				await sleep(delayMs);
 			}
@@ -232,6 +245,9 @@ export class KciClient {
 		)}`;
 
 		return this.boardSemaphore.run(async () => {
+			if (this.pacingMs > 0) {
+				await sleep(this.pacingMs);
+			}
 			const response = await this.request(url);
 
 			if (!response.ok) {
@@ -255,6 +271,9 @@ export class KciClient {
 		)}`;
 
 		return this.censusSemaphore.run(async () => {
+			if (this.pacingMs > 0) {
+				await sleep(this.pacingMs);
+			}
 			const response = await this.request(url);
 
 			if (response.status === 404) {

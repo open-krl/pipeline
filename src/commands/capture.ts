@@ -195,10 +195,14 @@ export async function executeCapture(
 		}
 	}
 
-	// 2. In-Memory Departure Board Fan-Out (Concurrency = 5)
+	// 2. In-Memory Departure Board Fan-Out (Concurrency = 3, Paced)
+	const startTime = Date.now();
 	const boardsMap = new Map<string, DepartureBoardItem[]>();
 	const rawBoardsMap = new Map<string, DepartureBoardResponse>();
-	let failedStationsCount = 0;
+	const failedStations: Array<{ id: string; name: string; reason: string }> =
+		[];
+	let completedCount = 0;
+	const totalStations = operationalStations.length;
 
 	await Promise.all(
 		operationalStations.map(async (station) => {
@@ -206,12 +210,21 @@ export async function executeCapture(
 				const schedule = await client.fetchStationSchedule(station.sta_id);
 				boardsMap.set(station.sta_id, schedule.data);
 				rawBoardsMap.set(station.sta_id, schedule);
-			} catch (err) {
-				console.warn(
-					`Warning: Failed to fetch board for ${station.sta_id} (${station.sta_name}):`,
-					err,
+				completedCount++;
+				console.log(
+					`[${String(completedCount).padStart(2, " ")}/${totalStations}] OK    ${station.sta_id.padEnd(5, " ")} (${station.sta_name}) - ${schedule.data.length} departures`,
 				);
-				failedStationsCount++;
+			} catch (err) {
+				completedCount++;
+				const reason = err instanceof Error ? err.message : String(err);
+				failedStations.push({
+					id: station.sta_id,
+					name: station.sta_name,
+					reason,
+				});
+				console.warn(
+					`[${String(completedCount).padStart(2, " ")}/${totalStations}] FAIL  ${station.sta_id.padEnd(5, " ")} (${station.sta_name}) - ${reason}`,
+				);
 			}
 		}),
 	);
@@ -222,7 +235,7 @@ export async function executeCapture(
 		);
 	}
 
-	const isDegraded = failedStationsCount > 0;
+	const isDegraded = failedStations.length > 0;
 	const currentBoardResponseHash = computeBoardResponseHash(boardsMap);
 
 	// Gate 2: Timetable Edition Gate (§8.1)
@@ -309,6 +322,26 @@ export async function executeCapture(
 		JSON.stringify(manifest, null, 2),
 		"utf-8",
 	);
+
+	const durationSecs = ((Date.now() - startTime) / 1000).toFixed(1);
+	const failedStr =
+		failedStations.length > 0
+			? ` (${failedStations.map((f) => `${f.id}: ${f.reason}`).join(", ")})`
+			: "";
+
+	console.log(`
+── Capture Summary ──────────────────────────────────────────
+Timetable Version:    ${versionToUse}
+Snapshot ID:          ${nextSnapshotId} (${resolvedDayType}, ${manifest.status})
+Operational Stations: ${totalStations}
+Successful Boards:    ${boardsMap.size}
+Failed Stations:      ${failedStations.length}${failedStr}
+Duration:             ${durationSecs}s
+Station Master Hash:  ${currentStationMasterHash.slice(0, 16)}...
+Board Response Hash:  ${currentBoardResponseHash.slice(0, 16)}...
+Saved to:             ${snapshotDir}
+─────────────────────────────────────────────────────────────
+`);
 
 	return {
 		timetable_version: versionToUse,

@@ -19,9 +19,11 @@ export const REGION_GROUPS: Record<RegionScope, readonly number[]> = {
 export const DEFAULT_REGION_SCOPE: RegionScope = "jabodetabek";
 
 export const CONCURRENCY = {
-	captureBoards: 5,
-	censusItineraries: 4,
+	captureBoards: 3,
+	censusItineraries: 3,
 } as const;
+
+export const PACING_MS = 500;
 
 export const RETRY = {
 	baseMs: 1000,

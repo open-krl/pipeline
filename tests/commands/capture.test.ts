@@ -129,6 +129,7 @@ describe("src/commands/capture", () => {
 			baseUrl: "https://mock.kci.id",
 			fetchFn: mockFetch,
 			retryBaseMs: 5,
+			pacingMs: 0,
 		});
 	}
 
