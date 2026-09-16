@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import { type CaptureManifest, CaptureManifestSchema } from "../api/schemas";
+import { resolveSafePath } from "./path";
 
 const execFileAsync = promisify(execFile);
 
@@ -119,10 +120,22 @@ export async function commitCaptureSnapshot(
 	}
 
 	// 2. Resolve manifest
-	const resolvedSnapshotDir = path.resolve(cwd, options.snapshotDir);
+	let resolvedSnapshotDir: string;
+	try {
+		resolvedSnapshotDir = resolveSafePath(options.snapshotDir, cwd);
+	} catch (err) {
+		return {
+			committed: false,
+			reason: `Invalid snapshot directory: ${err instanceof Error ? err.message : String(err)}`,
+		};
+	}
+
 	let manifest = options.manifest;
 	if (!manifest) {
-		const manifestPath = path.join(resolvedSnapshotDir, "manifest.json");
+		const manifestPath = resolveSafePath(
+			path.join(resolvedSnapshotDir, "manifest.json"),
+			resolvedSnapshotDir,
+		);
 		try {
 			const content = await fs.readFile(manifestPath, "utf-8");
 			manifest = CaptureManifestSchema.parse(JSON.parse(content));

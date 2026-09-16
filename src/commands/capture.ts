@@ -24,6 +24,7 @@ import {
 	computeBoardResponseHash,
 	computeStationMasterHash,
 } from "../core/manifest";
+import { resolveSafePath } from "../core/path";
 import { loadHolidays } from "../db/holidays";
 
 export interface CaptureOptions {
@@ -92,7 +93,8 @@ export async function scanTimetableVersions(
 	dataDir: string,
 ): Promise<number[]> {
 	try {
-		const entries = await fs.readdir(dataDir, { withFileTypes: true });
+		const safeDataDir = resolveSafePath(dataDir);
+		const entries = await fs.readdir(safeDataDir, { withFileTypes: true });
 		return entries
 			.filter((e) => e.isDirectory() && /^\d+$/.test(e.name))
 			.map((e) => Number.parseInt(e.name, 10))
@@ -109,8 +111,12 @@ export async function scanSnapshots(
 	dataDir: string,
 	version: number,
 ): Promise<Array<{ id: number; manifest: CaptureManifest }>> {
-	const capturesDir = path.join(dataDir, String(version), "captures");
 	try {
+		const safeDataDir = resolveSafePath(dataDir);
+		const capturesDir = resolveSafePath(
+			path.join(safeDataDir, String(version), "captures"),
+			safeDataDir,
+		);
 		const entries = await fs.readdir(capturesDir, { withFileTypes: true });
 		const snapshotIds = entries
 			.filter((e) => e.isDirectory() && /^\d+$/.test(e.name))
@@ -119,7 +125,10 @@ export async function scanSnapshots(
 
 		const snapshots: Array<{ id: number; manifest: CaptureManifest }> = [];
 		for (const id of snapshotIds) {
-			const manifestPath = path.join(capturesDir, String(id), "manifest.json");
+			const manifestPath = resolveSafePath(
+				path.join(capturesDir, String(id), "manifest.json"),
+				capturesDir,
+			);
 			try {
 				const content = await fs.readFile(manifestPath, "utf-8");
 				const parsed = CaptureManifestSchema.parse(JSON.parse(content));
@@ -164,7 +173,7 @@ export function filterOperationalStations(
  * Normalizes capture options into resolved operational parameters.
  */
 export function resolveCaptureContext(options: CaptureOptions) {
-	const dataDir = options.dataDir ?? path.resolve(process.cwd(), "data/raw");
+	const dataDir = resolveSafePath(options.dataDir ?? "data/raw");
 	const client = options.client ?? new KciClient();
 	const regionScope = options.region ?? DEFAULT_REGION_SCOPE;
 	const now = options.now ?? new Date();
@@ -417,30 +426,42 @@ export async function writeSnapshotToDisk(
 			? targetVersionSnapshots[targetVersionSnapshots.length - 1].id + 1
 			: 1;
 
-	const capturesParent = path.join(
-		params.dataDir,
-		String(params.versionToUse),
-		"captures",
+	const safeDataDir = resolveSafePath(params.dataDir ?? "data/raw");
+	const capturesParent = resolveSafePath(
+		path.join(safeDataDir, String(params.versionToUse), "captures"),
+		safeDataDir,
 	);
-	const snapshotDir = path.join(capturesParent, String(nextSnapshotId));
-	const tmpDir = path.join(
+	const snapshotDir = resolveSafePath(
+		path.join(capturesParent, String(nextSnapshotId)),
 		capturesParent,
-		`.tmp_${nextSnapshotId}_${Date.now()}`,
 	);
-	const tmpBoardsDir = path.join(tmpDir, "boards");
+	const tmpDir = resolveSafePath(
+		path.join(capturesParent, `.tmp_${nextSnapshotId}_${Date.now()}`),
+		capturesParent,
+	);
+	const tmpBoardsDir = resolveSafePath(path.join(tmpDir, "boards"), tmpDir);
 
 	await fs.mkdir(tmpBoardsDir, { recursive: true });
 
 	try {
-		await fs.writeFile(
+		const stationsPath = resolveSafePath(
 			path.join(tmpDir, "stations.json"),
+			tmpDir,
+		);
+		await fs.writeFile(
+			stationsPath,
 			JSON.stringify(params.stationsResponse, null, 2),
 			"utf-8",
 		);
 
 		for (const [staId, boardData] of params.rawBoardsMap.entries()) {
+			const safeStaId = path.basename(staId);
+			const boardPath = resolveSafePath(
+				path.join(tmpBoardsDir, `${safeStaId}.json`),
+				tmpBoardsDir,
+			);
 			await fs.writeFile(
-				path.join(tmpBoardsDir, `${staId}.json`),
+				boardPath,
 				JSON.stringify(boardData, null, 2),
 				"utf-8",
 			);
@@ -461,8 +482,12 @@ export async function writeSnapshotToDisk(
 		// Validate manifest schema before promoting to disk
 		CaptureManifestSchema.parse(manifest);
 
-		await fs.writeFile(
+		const manifestPath = resolveSafePath(
 			path.join(tmpDir, "manifest.json"),
+			tmpDir,
+		);
+		await fs.writeFile(
+			manifestPath,
 			JSON.stringify(manifest, null, 2),
 			"utf-8",
 		);

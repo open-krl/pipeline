@@ -12,6 +12,7 @@ import {
 import { formatSnapshotTable, getSnapshotList } from "./commands/snapshots";
 import { type RegionScope, RegionScopeSchema } from "./config";
 import { commitCaptureSnapshot } from "./core/git";
+import { resolveSafePath } from "./core/path";
 
 async function main() {
 	const args = process.argv.slice(2);
@@ -94,7 +95,17 @@ List Snapshots Usage:
 
 			const newVersion = values["new-version"];
 			const yes = values.yes;
-			const dataDir = values["data-dir"];
+			let dataDir: string | undefined;
+			if (values["data-dir"]) {
+				try {
+					dataDir = resolveSafePath(values["data-dir"]);
+				} catch (err) {
+					console.error(
+						`Error: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+			}
 			const commit = values.commit ? true : undefined;
 			const noCommit = values["no-commit"];
 
@@ -155,8 +166,15 @@ List Snapshots Usage:
 				allowPositionals: true,
 			});
 
-			const dataDir =
-				values["data-dir"] ?? path.resolve(process.cwd(), "data/raw");
+			let dataDir: string;
+			try {
+				dataDir = resolveSafePath(values["data-dir"] ?? "data/raw");
+			} catch (err) {
+				console.error(
+					`Error: ${err instanceof Error ? err.message : String(err)}`,
+				);
+				process.exit(1);
+			}
 			let version: number;
 			let snapshotId: number;
 
@@ -210,7 +228,17 @@ List Snapshots Usage:
 				allowPositionals: true,
 			});
 
-			const dataDir = values["data-dir"];
+			let dataDir: string | undefined;
+			if (values["data-dir"]) {
+				try {
+					dataDir = resolveSafePath(values["data-dir"]);
+				} catch (err) {
+					console.error(
+						`Error: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+			}
 			const version =
 				positionals.length > 0
 					? Number.parseInt(positionals[0], 10)

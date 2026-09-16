@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import type { CaptureManifest } from "../api/schemas";
+import { resolveSafePath } from "../core/path";
 import { scanSnapshots, scanTimetableVersions } from "./capture";
 
 const execFileAsync = promisify(execFile);
@@ -28,7 +29,8 @@ export async function resolveSnapshotCommit(
 	cwd = process.cwd(),
 ): Promise<string | null> {
 	try {
-		const relativePath = path.relative(cwd, snapshotDir);
+		const safeSnapshotDir = resolveSafePath(snapshotDir, cwd);
+		const relativePath = path.relative(cwd, safeSnapshotDir);
 		const { stdout } = await execFileAsync(
 			"git",
 			["log", "-n", "1", "--format=%h", "--", relativePath],
@@ -48,7 +50,7 @@ export async function getSnapshotList(
 	options: ListSnapshotsOptions = {},
 	cwd = process.cwd(),
 ): Promise<SnapshotEntry[]> {
-	const dataDir = options.dataDir ?? path.resolve(cwd, "data/raw");
+	const dataDir = resolveSafePath(options.dataDir ?? "data/raw", cwd);
 	const allVersions = await scanTimetableVersions(dataDir);
 	const targetVersions =
 		options.version !== undefined
@@ -60,11 +62,9 @@ export async function getSnapshotList(
 	for (const version of targetVersions) {
 		const snapshots = await scanSnapshots(dataDir, version);
 		for (const snap of snapshots) {
-			const snapshotDir = path.join(
+			const snapshotDir = resolveSafePath(
+				path.join(dataDir, String(version), "captures", String(snap.id)),
 				dataDir,
-				String(version),
-				"captures",
-				String(snap.id),
 			);
 			const gitCommit = await resolveSnapshotCommit(snapshotDir, cwd);
 			entries.push({
