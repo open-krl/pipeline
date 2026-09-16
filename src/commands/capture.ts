@@ -19,6 +19,7 @@ import {
 	type RegionScope,
 } from "../config";
 import { formatDateWib, resolveDayType } from "../core/calendar";
+import { type CommitSnapshotResult, commitCaptureSnapshot } from "../core/git";
 import {
 	computeBoardResponseHash,
 	computeStationMasterHash,
@@ -35,6 +36,8 @@ export interface CaptureOptions {
 	yes?: boolean;
 	now?: Date;
 	promptFn?: (question: string, defaultYes?: boolean) => Promise<boolean>;
+	commit?: boolean;
+	noCommit?: boolean;
 }
 
 export interface CaptureResult {
@@ -42,6 +45,7 @@ export interface CaptureResult {
 	snapshot_id: number;
 	snapshot_dir: string;
 	manifest: CaptureManifest;
+	commitResult?: CommitSnapshotResult;
 }
 
 export interface FailedStation {
@@ -179,6 +183,8 @@ export function resolveCaptureContext(options: CaptureOptions) {
 		resolvedDayType,
 		newVersion: Boolean(options.newVersion),
 		yes: Boolean(options.yes),
+		commit: options.commit,
+		noCommit: Boolean(options.noCommit),
 	};
 }
 
@@ -561,5 +567,27 @@ export async function executeCapture(
 		durationSecs: boardsResult.durationSecs,
 	});
 
-	return result;
+	// 7. Optional Git Auto-Commit Integration
+	let commitResult: CommitSnapshotResult | undefined;
+	if (ctx.commit && !ctx.noCommit) {
+		commitResult = await commitCaptureSnapshot({
+			snapshotDir: result.snapshot_dir,
+			manifest: result.manifest,
+		});
+
+		if (commitResult.committed) {
+			console.log(
+				`[Git] Committed snapshot to git: ${commitResult.commitHash?.slice(0, 7)}`,
+			);
+		} else {
+			console.warn(
+				`[Git] Notice: Snapshot not committed: ${commitResult.reason}`,
+			);
+		}
+	}
+
+	return {
+		...result,
+		commitResult,
+	};
 }
