@@ -25,7 +25,6 @@ out body;
 
 // Known ticketing code overrides (OSM -> KAI official)
 const CODE_OVERRIDES: Record<string, string> = {
-	GRG: "GGL", // Grogol
 	PCN: "POC", // Pondok Cina
 	TTI: "THI", // Tanah Tinggi
 	TOJ: "TOJB", // Tonjong Baru
