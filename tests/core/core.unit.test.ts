@@ -69,6 +69,16 @@ describe("src/core/trainid", () => {
 		expect(parseTrainId("")).toBeNull();
 		expect(parseTrainId("ABC")).toBeNull();
 	});
+
+	it("sanitizes transport whitespace at boundary", () => {
+		const parsed = parseTrainId("  5022D \n");
+		expect(parsed).toEqual({
+			trip_id: "5022D",
+			base_train_no: 5022,
+			revision: "D",
+			is_fakultatif: false,
+		});
+	});
 });
 
 describe("src/core/time", () => {

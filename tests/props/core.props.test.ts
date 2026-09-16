@@ -24,7 +24,7 @@ const validTrainIdArb = fc
 
 const malformedTrainIdArb = fc
 	.string({ minLength: 1, maxLength: 10 })
-	.filter((s) => !TRAIN_ID_GRAMMAR.test(s));
+	.filter((s) => !TRAIN_ID_GRAMMAR.test(s.trim()));
 
 test("trainid: valid identifiers parse and round-trip losslessly", () => {
 	fc.assert(
