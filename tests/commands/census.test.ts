@@ -221,7 +221,7 @@ describe("src/commands/census", () => {
 
 		// Corrupted JSON should throw instead of returning null
 		await fs.writeFile(envelopePath, "not valid json {", "utf-8");
-		expect(readItineraryEnvelope(envelopePath)).rejects.toThrow();
+		await expect(readItineraryEnvelope(envelopePath)).rejects.toThrow();
 	});
 
 	it("runStratifiedSpotCheck detects hash divergence and permits fakultatif suspension", async () => {

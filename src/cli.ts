@@ -266,7 +266,6 @@ List Snapshots Usage:
 					version: { type: "string" },
 					"data-dir": { type: "string" },
 					commit: { type: "boolean", default: false },
-					yes: { type: "boolean", default: false },
 				},
 				allowPositionals: true,
 			});
@@ -315,7 +314,6 @@ List Snapshots Usage:
 					version,
 					dataDir,
 					commit: values.commit,
-					yes: values.yes,
 				});
 
 				console.log(`

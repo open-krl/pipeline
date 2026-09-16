@@ -31,7 +31,6 @@ export interface CensusOptions {
 	version?: number;
 	dayType?: DayType;
 	reprobeAll?: boolean;
-	yes?: boolean;
 	now?: Date;
 	commit?: boolean;
 	onProgress?: (progress: CensusProgress) => void;
