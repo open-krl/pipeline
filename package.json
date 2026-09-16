@@ -1,27 +1,28 @@
 {
-  "name": "krl-schedule-pipeline",
-  "version": "0.1.0",
-  "type": "module",
-  "scripts": {
-    "format": "biome format --write",
-    "lint": "biome lint",
-    "check": "biome check",
-    "test": "bun test",
-    "typecheck": "tsc --noEmit",
-    "smoke": "bun scripts/smoke.ts",
-    "analyze:fixtures": "bun scripts/analyze-fixtures.ts"
-  },
-  "dependencies": {
-    "drizzle-orm": "^1.0.0-rc.4",
-    "zod": "^4"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "2.5.13",
-    "@types/bun": "^1.4.2",
-    "@types/node": "^22.20.3",
-    "drizzle-kit": "^1.0.0-rc.4",
-    "fast-check": "^4",
-    "lefthook": "^2.1.14",
-    "typescript": "^7.0.2"
-  }
+	"name": "krl-schedule-pipeline",
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"format": "biome format --write",
+		"lint": "biome lint",
+		"check": "biome check",
+		"test": "bun test",
+		"typecheck": "tsc --noEmit",
+		"smoke": "bun scripts/smoke.ts",
+		"analyze:fixtures": "bun scripts/analyze-fixtures.ts",
+		"fetch:holidays": "bun scripts/fetch-holidays.ts"
+	},
+	"dependencies": {
+		"drizzle-orm": "^1.0.0-rc.4",
+		"zod": "^4"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.5.13",
+		"@types/bun": "^1.4.2",
+		"@types/node": "^22.20.3",
+		"drizzle-kit": "^1.0.0-rc.4",
+		"fast-check": "^4",
+		"lefthook": "^2.1.14",
+		"typescript": "^7.0.2"
+	}
 }
