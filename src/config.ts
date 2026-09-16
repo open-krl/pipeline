@@ -3,8 +3,7 @@
 export const API_BASE_URL = "https://www.kci.id";
 
 export const API_HEADERS = {
-	"User-Agent":
-		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+	"User-Agent": "Mozilla/5.0",
 	Accept: "application/json, text/plain, */*",
 	Referer: "https://www.kci.id/",
 } as const;
