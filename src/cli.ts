@@ -3,14 +3,14 @@
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
 import { parseArgs } from "node:util";
-import type { DayType } from "./api/schemas";
+import { type DayType, DayTypeSchema } from "./api/schemas";
 import {
 	executeCapture,
 	scanSnapshots,
 	scanTimetableVersions,
 } from "./commands/capture";
 import { formatSnapshotTable, getSnapshotList } from "./commands/snapshots";
-import type { RegionScope } from "./config";
+import { type RegionScope, RegionScopeSchema } from "./config";
 import { commitCaptureSnapshot } from "./core/git";
 
 async function main() {
@@ -68,8 +68,30 @@ List Snapshots Usage:
 				allowPositionals: false,
 			});
 
-			const dayType = values["day-type"] as DayType | undefined;
-			const region = values.region as RegionScope | undefined;
+			let dayType: DayType | undefined;
+			if (values["day-type"]) {
+				const res = DayTypeSchema.safeParse(values["day-type"]);
+				if (!res.success) {
+					console.error(
+						`Error: Invalid --day-type '${values["day-type"]}'. Allowed values: ${Object.values(DayTypeSchema.enum).join(", ")}`,
+					);
+					process.exit(1);
+				}
+				dayType = res.data;
+			}
+
+			let region: RegionScope | undefined;
+			if (values.region) {
+				const res = RegionScopeSchema.safeParse(values.region);
+				if (!res.success) {
+					console.error(
+						`Error: Invalid --region '${values.region}'. Allowed values: ${Object.values(RegionScopeSchema.enum).join(", ")}`,
+					);
+					process.exit(1);
+				}
+				region = res.data;
+			}
+
 			const newVersion = values["new-version"];
 			const yes = values.yes;
 			const dataDir = values["data-dir"];

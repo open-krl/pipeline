@@ -82,6 +82,7 @@ export interface KciClientOptions {
 	retryBaseMs?: number;
 	retryFactor?: number;
 	maxRetries?: number;
+	timeoutMs?: number;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -99,6 +100,7 @@ export class KciClient {
 	readonly retryBaseMs: number;
 	readonly retryFactor: number;
 	readonly maxRetries: number;
+	readonly timeoutMs: number;
 
 	constructor(options: KciClientOptions = {}) {
 		this.baseUrl = (options.baseUrl ?? API_BASE_URL).replace(/\/+$/, "");
@@ -113,6 +115,7 @@ export class KciClient {
 		this.retryBaseMs = options.retryBaseMs ?? RETRY.baseMs;
 		this.retryFactor = options.retryFactor ?? RETRY.factor;
 		this.maxRetries = options.maxRetries ?? RETRY.maxRetries;
+		this.timeoutMs = options.timeoutMs ?? 15000;
 	}
 
 	/**
@@ -123,8 +126,14 @@ export class KciClient {
 
 		for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
 			try {
+				const timeoutSignal = AbortSignal.timeout(this.timeoutMs);
+				const signal = init?.signal
+					? AbortSignal.any([init.signal, timeoutSignal])
+					: timeoutSignal;
+
 				const response = await this.fetchFn(url, {
 					...init,
+					signal,
 					headers: {
 						...API_HEADERS,
 						...(init?.headers ?? {}),
@@ -148,8 +157,17 @@ export class KciClient {
 						const parsedSeconds = Number.parseInt(retryAfterHeader, 10);
 						if (!Number.isNaN(parsedSeconds) && parsedSeconds > 0) {
 							delayMs = parsedSeconds * 1000;
+						} else {
+							const parsedTimestamp = Date.parse(retryAfterHeader);
+							if (!Number.isNaN(parsedTimestamp)) {
+								const diffMs = parsedTimestamp - Date.now();
+								if (diffMs > 0) {
+									delayMs = diffMs;
+								}
+							}
 						}
 					}
+					delayMs = Math.min(delayMs, RETRY.maxDelayMs);
 					console.warn(
 						`[RATE LIMIT] 429 on ${url} - backing off for ${delayMs}ms (attempt ${attempt + 1}/${this.maxRetries})...`,
 					);

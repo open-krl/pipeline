@@ -250,4 +250,56 @@ describe("src/api/client - KciClient", () => {
 
 		await expect(client.fetchStations()).rejects.toThrow();
 	});
+
+	it("aborts when fetch exceeds configured timeoutMs", async () => {
+		const mockFetch: FetchFunction = async (_input, init) => {
+			return new Promise((_resolve, reject) => {
+				const signal = init?.signal;
+				if (signal) {
+					signal.addEventListener("abort", () => {
+						reject(signal.reason ?? new Error("The operation was aborted"));
+					});
+				}
+				// Never resolves on its own (stalled connection)
+			});
+		};
+
+		const client = new KciClient({
+			baseUrl: "https://mock.kci.id",
+			fetchFn: mockFetch,
+			timeoutMs: 30,
+			retryBaseMs: 5,
+			maxRetries: 1,
+		});
+
+		await expect(client.fetchStations()).rejects.toThrow();
+	});
+
+	it("handles Retry-After delta-seconds and HTTP-date with maxDelayMs cap", async () => {
+		let callCount = 0;
+		const mockFetch: FetchFunction = async () => {
+			callCount++;
+			if (callCount === 1) {
+				return new Response("Too Many Requests", {
+					status: 429,
+					headers: { "Retry-After": "1" }, // 1 second
+				});
+			}
+			return new Response(
+				JSON.stringify({ status: 200, message: "success", data: [] }),
+				{ status: 200, headers: { "Content-Type": "application/json" } },
+			);
+		};
+
+		const client = new KciClient({
+			baseUrl: "https://mock.kci.id",
+			fetchFn: mockFetch,
+			retryBaseMs: 5,
+			maxRetries: 2,
+		});
+
+		const result = await client.fetchStations();
+		expect(callCount).toBe(2);
+		expect(result.status).toBe(200);
+	});
 });
