@@ -25,57 +25,61 @@ out body;
 
 // Known ticketing code overrides (OSM -> KAI official)
 const CODE_OVERRIDES: Record<string, string> = {
-  GRG: "GGL",   // Grogol
-  PCN: "POC",   // Pondok Cina
-  TTI: "THI",   // Tanah Tinggi
-  TOJ: "TOJB",  // Tonjong Baru
+	GRG: "GGL", // Grogol
+	PCN: "POC", // Pondok Cina
+	TTI: "THI", // Tanah Tinggi
+	TOJ: "TOJB", // Tonjong Baru
 };
 
 // Fallbacks for stations missing codes in OSM
 const NAME_OVERRIDES: Record<string, string> = {
-  "Batu Ceper": "BPR",
-  "Jatake": "JTK",
+	"Batu Ceper": "BPR",
+	Jatake: "JTK",
 };
 
 async function main() {
-  console.log("Fetching station coordinates from Overpass API...");
-  
-  const response = await fetch(OVERPASS_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "User-Agent": "KRL-Schedule-DB/1.2 (github.com/your-repo)",
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: `data=${encodeURIComponent(OVERPASS_QUERY)}`,
-  });
+	console.log("Fetching station coordinates from Overpass API...");
 
-  if (!response.ok) {
-    throw new Error(`Overpass API error: ${response.status} ${response.statusText}`);
-  }
+	const response = await fetch(OVERPASS_ENDPOINT, {
+		method: "POST",
+		headers: {
+			"User-Agent": "KRL-Schedule-DB/1.2 (github.com/your-repo)",
+			"Content-Type": "application/x-www-form-urlencoded",
+		},
+		body: `data=${encodeURIComponent(OVERPASS_QUERY)}`,
+	});
 
-  const csvText = await response.text();
-  const lines = csvText.trim().split("\n");
-  const rows = lines.slice(1); // skip header
+	if (!response.ok) {
+		throw new Error(
+			`Overpass API error: ${response.status} ${response.statusText}`,
+		);
+	}
 
-  const output: string[] = ["sta_id,sta_name,lat,lon"];
+	const csvText = await response.text();
+	const lines = csvText.trim().split("\n");
+	const rows = lines.slice(1); // skip header
 
-  for (const row of rows) {
-    const parts = row.split(",");
-    if (parts.length < 6) continue;
+	const output: string[] = ["sta_id,sta_name,lat,lon"];
 
-    const [id, name, railwayRef, ref, lat, lon] = parts;
+	for (const row of rows) {
+		const parts = row.split(",");
+		if (parts.length < 6) continue;
 
-    // Resolve station code
-    let code = railwayRef || ref || NAME_OVERRIDES[name] || "";
-    if (CODE_OVERRIDES[code]) {
-      code = CODE_OVERRIDES[code];
-    }
+		const [id, name, railwayRef, ref, lat, lon] = parts;
 
-    output.push(`${code},${name.toUpperCase()},${lat},${lon}`);
-  }
+		// Resolve station code
+		let code = railwayRef || ref || NAME_OVERRIDES[name] || "";
+		if (CODE_OVERRIDES[code]) {
+			code = CODE_OVERRIDES[code];
+		}
 
-  writeFileSync("data/station_coordinates.csv", output.join("\n"));
-  console.log(`Successfully wrote ${output.length - 1} stations to data/station_coordinates.csv`);
+		output.push(`${code},${name.toUpperCase()},${lat},${lon}`);
+	}
+
+	writeFileSync("data/station_coordinates.csv", output.join("\n"));
+	console.log(
+		`Successfully wrote ${output.length - 1} stations to data/station_coordinates.csv`,
+	);
 }
 
 main().catch(console.error);

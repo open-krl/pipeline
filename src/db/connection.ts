@@ -9,19 +9,20 @@ import * as schema from "./tables";
  * every run (Section 8). No migration state exists to carry between builds.
  */
 export function initDb(path: string, schemaPath?: string) {
-  for (const p of [path, `${path}-wal`, `${path}-shm`]) {
-    rmSync(p, { force: true });
-  }
+	for (const p of [path, `${path}-wal`, `${path}-shm`]) {
+		rmSync(p, { force: true });
+	}
 
-  const sqlite = new Database(path);
-  sqlite.exec("PRAGMA journal_mode = WAL;");
-  sqlite.exec("PRAGMA foreign_keys = ON;");
+	const sqlite = new Database(path);
+	sqlite.exec("PRAGMA journal_mode = WAL;");
+	sqlite.exec("PRAGMA foreign_keys = ON;");
 
-  const resolvedSchemaPath =
-    schemaPath ?? fileURLToPath(new URL("../../db/schema.sql", import.meta.url));
-  const ddl = readFileSync(resolvedSchemaPath, "utf8");
-  sqlite.exec(ddl);
+	const resolvedSchemaPath =
+		schemaPath ??
+		fileURLToPath(new URL("../../db/schema.sql", import.meta.url));
+	const ddl = readFileSync(resolvedSchemaPath, "utf8");
+	sqlite.exec(ddl);
 
-  const db = drizzle({ client: sqlite });
-  return { sqlite, db };
+	const db = drizzle({ client: sqlite });
+	return { sqlite, db };
 }
