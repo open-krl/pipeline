@@ -1,6 +1,6 @@
 # Design & Discovery Document — KRL Schedule Database
 
-**Version:** 1.4  
+**Version:** 1.5  
 ---
 
 ## 1. Purpose & Deliverables
@@ -450,7 +450,10 @@ data/raw/
           └── ...
 ```
 
-**`timetable_version` Assignment Rule:** During `capture`, the engine queries the station master for the active `region_scope` and inspects existing capture manifests under `data/raw/`. If the computed `station_master_hash` matches the latest manifest for that region, it reuses that `timetable_version`. If `station_master_hash` differs, a network station catalog mutation is detected, and `timetable_version` is incremented (with operator confirmation).
+**`timetable_version` Assignment Rule:** During `capture`, the engine queries the station master for the active `region_scope` and inspects existing capture manifests under `data/raw/`. Version assignment follows a two-tier check:
+1. **Station Catalog Gate:** If `station_master_hash` differs from the active edition manifest, a physical network catalog mutation is detected, prompting to initialize `<timetable_version + 1>`.
+2. **Board Signature Drift Gate:** If `station_master_hash` matches, `capture` completes the station departure board fan-out in memory and computes `board_response_hash`. If an existing snapshot of the **same day type** exists in `<timetable_version>`, the hashes are compared. A mismatch indicates an unannounced mid-edition timetable revision, prompting the operator before writing or committing: *"Board signature diverges from active edition baseline for day type. Suspected new timetable edition. Increment version? [y/N]"*.
+3. **Explicit Override:** Operators can explicitly force a clean edition increment via `capture --new-version` (e.g. for announced GAPEKA timetable overhauls).
 
 ### 8.2 The Capture Manifest Contract (`manifest.json`)
 Every capture execution writes an authoritative metadata contract to `manifest.json`, eliminating implicit CLI assumptions:
@@ -529,10 +532,10 @@ Execution runs via a local TypeScript/Bun CLI toolchain requiring zero long-runn
 | `build` | Archive + config | SQLite DB (`trip_calendar`, `quarantined_trips`) | $\ge 1$ complete snapshot, same edition | **Pure fold, deterministic** |
 | `export` | DB + config | GTFS CSVs + validation report | Any build | Pure |
 | `calendar` | DB / Archive | Set-difference report & diff table | $\ge 2$ same-edition day types | Pure, read-only (out-of-DAG) |
-| `detect` | Single station board | Drift report vs. active edition | Any time post-build | Side-effectful probe (out-of-DAG) |
+| `detect` | 3 corridor hub boards | Drift report vs. active edition day type | Any time post-build | Side-effectful probe (out-of-DAG) |
 
 ### CLI Command Reference
-- **`capture`**: Evaluates the current date against `data/holidays.json`, displays the calculated `day_type`, prompts for user confirmation, queries the station master, and fans out across all station departure boards (~85 stations, concurrency 5, ~3 minutes total). Emits `manifest.json` and commits raw payloads to git.
+- **`capture`**: Evaluates the current date against `data/holidays.json`, displays the calculated `day_type`, prompts for user confirmation, queries the station master, and fans out across all station departure boards (~85 stations, concurrency 5, ~3 minutes total). Computes `station_master_hash` and `board_response_hash`, verifies against existing same-day-type manifests in the active version to detect schedule edition drift before disk write, emits `manifest.json`, and commits raw payloads to git. Supports `--new-version` to explicitly bootstrap a fresh timetable edition (e.g., for published GAPEKA revisions).
 - **`census`**: Reads all discovered `train_id` values across existing snapshot captures, checks the local payload cache, and issues requests for missing itineraries (~1,000–1,500 calls, concurrency 4, ~35–40 minutes). Resumable and incremental; fetches only unprobed IDs.
   - **Stratified Spot-Check:** When executing against an existing cache on a subsequent day type, `census` runs an automated stratified probe (~30–45 s) sampling 5 representative services: 1 Bogor trunk train, 1 Cikarang trunk train, 1 loop-line train (racket topology), 1 branch line train (Rangkasbitung or Merak), and 1 fakultatif (`F`-suffix) train. (For `F`-suffix trains on weekends, an upstream 404 or departure board absence represents expected operational suspension, not hash divergence). It compares canonical `payload_hash` values against cached weekday observations. If no divergence is detected in sampled strata, delta census proceeds for newly discovered `train_id`s. If divergence is detected, the runbook escalation path is engaged.
   - **CLI Flags:**
@@ -542,13 +545,14 @@ Execution runs via a local TypeScript/Bun CLI toolchain requiring zero long-runn
 - **`export`**: Compiles GTFS specification CSV files (`agency`, `stops`, `routes`, `trips`, `stop_times`, `calendar`, `calendar_dates`) and produces an export summary and validation report. In provisional calendar states, exports conservative observed-day masks. Supports release-gate flags:
   - `--require-resolved-calendar`: Enforces that all 3 day types (weekday, Saturday, Sunday) have been folded into `trip_calendar` with `calendar_state = 'resolved'`.
   - `--require-census-complete`: Asserts that zero discovered trips remain with `itinerary_status = 'unprobed'`, preventing incomplete stop sequences from entering production feeds.
+  - `--require-holiday-coverage`: Asserts that the export feed validity horizon does not extend past the latest statutory date defined in `data/holidays.json`. When omitted, emits a visible audit warning if feed dates exceed covered holiday decrees.
 - **`calendar`**: (Out-of-DAG read-only tool) Pretty-prints the three-way set-difference across day types for human review, outputting empirical schedule identity statistics (verifying static vs. date-aware behavior).
-- **`detect`**: (Out-of-DAG operational monitor) Probes a single reference station board (e.g., Manggarai or Bekasi) and compares the resulting signature with the active database edition to detect unannounced timetable revisions.
+- **`detect`**: (Out-of-DAG operational monitor) Probes a 3-station signature representing key corridor families—Manggarai (Central/Bogor), Bekasi (Cikarang), and Rangkasbitung (Western branch)—and compares the live departures against the active database edition filtered for **today's specific day type** (`trip_calendar[day_type] == 1`). Eliminates false positives from weekend calendar variance and avoids spatial blind spots on branch lines in ~15 seconds.
 
 ### Auxiliary Tooling
 - **`scripts/fetch-station-coordinates.ts`**: Standalone extraction script executed via Bun. Queries the public Overpass API using strict spatial bounding and negative operator/mode filters, resolves OSM tagging inconsistencies, and generates the canonical `data/station_coordinates.csv` file for offline `build` and `export` runs.
 
-### Phased Runbook (v1.4)
+### Phased Runbook (v1.5)
 1. **Day-1 Baseline Bootstrap:** Execute `capture` on a confirmed standard working day (Tuesday, Wednesday, or Thursday). Run `census` for discovered trains, followed immediately by `build` and `export`. A complete, functional SQLite database and provisional weekday GTFS feed are operational on day one.
 2. **Weekend Enrichment (Order-Free, Incremental):** Execute `capture` on the subsequent Saturday and Sunday. Run `census` (executes the stratified spot-check in ~45 s, then fetches only newly discovered delta trains).
    - **Escalation Path (If Divergence Detected):** If the stratified spot-check detects payload hash divergence on active runs, execute `census --reprobe-all --day-type <saturday|sunday>` to populate day-specific observations before building.
@@ -621,7 +625,7 @@ Transient network failures during `capture` or `census` trigger exponential back
 | **Loop-Line Double-Visit Board Rows** | Verify whether trains calling twice at interchange loop stations (e.g., Kampung Bandan `KPB` or Jatinegara `JNG`) generate two distinct departure board rows for the same `train_id`. | **Open** ⏳ | Invariant 13 counts board departure rows (not distinct stations). If upstream collapses loop double-visits into a single board row, the invariant reconciles loop topology via itinerary sequence inspection. |
 | **Weekday Uniformity** | Comparative diff between Tuesday and Thursday board captures. | **Open** ⏳ | Assumed identical based on operational domain standards; verifiable via multi-day capture comparison. |
 | **Itinerary Census Coverage** | Total network itinerary census probe. | **Open** ⏳ | Determines whether the fallback reconstruction path remains an exceptional fallback or a standard path. |
-| **Annual Holiday Rules** | Cross-check national SKB 3 Menteri holiday decrees against captured dates. | **Open** ⏳ | Sourced from version-controlled `data/holidays.json` with annual maintenance. |
+| **Annual Holiday Coverage** | Cross-check national SKB 3 Menteri holiday decrees against feed dates. | **Enforced by Gate** ✅ | Governed by `--require-holiday-coverage` export gate and audit warnings, preventing uncovered holiday exceptions from silently entering GTFS feeds. Sourced from version-controlled `data/holidays.json`. |
 
 ---
 
