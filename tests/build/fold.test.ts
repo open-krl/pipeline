@@ -324,6 +324,111 @@ describe("Pure Functional Fold Suite", () => {
 		expect(stops[2].departure_secs).toBeNull();
 	});
 
+	it("selects the snapshot with the largest occurrence count when reconstructing", () => {
+		const snap1Boards = new Map<string, DepartureBoardResponse>();
+		snap1Boards.set("KPB", {
+			status: 200,
+			data: [
+				{
+					train_id: "5998A",
+					ka_name: "COMMUTER LINE CIKARANG",
+					route_name: "KAMPUNGBANDAN-CIKARANG",
+					dest: "CIKARANG",
+					time_est: "10:00:00",
+					color: "#0084D8",
+					dest_time: "11:15:00",
+				},
+			],
+		});
+		snap1Boards.set("BKS", {
+			status: 200,
+			data: [
+				{
+					train_id: "5998A",
+					ka_name: "COMMUTER LINE CIKARANG",
+					route_name: "KAMPUNGBANDAN-CIKARANG",
+					dest: "CIKARANG",
+					time_est: "10:45:00",
+					color: "#0084D8",
+					dest_time: "11:15:00",
+				},
+			],
+		});
+
+		// Snapshot 2 has 3 boards (more complete than Snapshot 1)
+		const snap2Boards = new Map<string, DepartureBoardResponse>();
+		snap2Boards.set("KPB", snap1Boards.get("KPB")!);
+		snap2Boards.set("MRI", {
+			status: 200,
+			data: [
+				{
+					train_id: "5998A",
+					ka_name: "COMMUTER LINE CIKARANG",
+					route_name: "KAMPUNGBANDAN-CIKARANG",
+					dest: "CIKARANG",
+					time_est: "10:20:00",
+					color: "#0084D8",
+					dest_time: "11:15:00",
+				},
+			],
+		});
+		snap2Boards.set("BKS", snap1Boards.get("BKS")!);
+
+		const archive: RawArchive = {
+			timetableVersion: 1,
+			snapshots: [
+				{
+					id: 1,
+					manifest: {
+						timetable_version: 1,
+						snapshot_id: 1,
+						snapshot_date: "2026-09-17",
+						day_type: "weekday",
+						region_scope: "jabodetabek",
+						station_master_hash: "hash",
+						board_response_hash: "board1",
+						fetched_at: "2026-09-17T03:00:00Z",
+						status: "complete",
+					},
+					archiveCommit: "commit1",
+					stations: stationsPayload,
+					boards: snap1Boards,
+				},
+				{
+					id: 2,
+					manifest: {
+						timetable_version: 1,
+						snapshot_id: 2,
+						snapshot_date: "2026-09-18",
+						day_type: "weekday",
+						region_scope: "jabodetabek",
+						station_master_hash: "hash",
+						board_response_hash: "board2",
+						fetched_at: "2026-09-18T03:00:00Z",
+						status: "complete",
+					},
+					archiveCommit: "commit2",
+					stations: stationsPayload,
+					boards: snap2Boards,
+				},
+			],
+			itineraries: new Map(),
+			stationCoordinates: new Map(),
+			holidays: [],
+		};
+
+		const result = foldArchive(archive);
+		const trip = result.trips.find((t) => t.trip_id === "5998A");
+		expect(trip?.total_stops).toBe(4); // KPB, MRI, BKS + CKR terminus
+		const stops = result.tripStops.filter((s) => s.trip_id === "5998A");
+		expect(stops.map((s) => s.station_id)).toEqual([
+			"KPB",
+			"MRI",
+			"BKS",
+			"CKR",
+		]);
+	});
+
 	it("quarantines trips with cross-capture attribute conflict (Inv 12)", () => {
 		const snap1Boards = new Map<string, DepartureBoardResponse>();
 		snap1Boards.set("KPB", {

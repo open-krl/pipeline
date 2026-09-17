@@ -394,9 +394,11 @@ export function foldArchive(archive: RawArchive): FoldResult {
 		}
 
 		if (!itineraryValid) {
-			// Fallback to topological reconstruction
-			const representativeSnapOccs =
-				bySnapshot.get(firstSnapshotId) ?? occurrences;
+			// Fallback to topological reconstruction using the most complete snapshot
+			const representativeSnapOccs = Array.from(bySnapshot.values()).reduce(
+				(best, curr) => (curr.length > best.length ? curr : best),
+				[] as SnapshotBoardRecord[],
+			);
 			const reconstructed = reconstructFromBoards(
 				representativeSnapOccs,
 				destStationId,
