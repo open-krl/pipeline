@@ -23,8 +23,8 @@ flowchart LR
 | **Milestone 3** | Stage 2 Census (`krl census`) | Stratified spot-checks, resumable crawler, multi-observation envelopes | ✅ **Completed** |
 | **Milestone 4** | Stage 3 Build (`krl build`) | Pure functional fold, 13 invariants, topological fallback, SQLite WAL DB | ✅ **Completed** |
 | **Milestone 5** | Stage 4 Export (`krl export`) | GTFS spec CSVs, release gates, validation report, zip packaging | ✅ **Completed** |
-| **Milestone 6** | Semantic Diffing & Diagnostics | Out-of-DAG tools: Core diff engine, `krl diff`, Gate 1/2 & census explanations, `krl calendar`, `krl detect` | 🟡 **Next Up** |
-| **Milestone 7** | Automation & Hardening | CI/CD test automation, scheduled cron captures, release distribution | ⚪ Planned |
+| **Milestone 6** | Semantic Diffing & Diagnostics | Out-of-DAG tools: Core diff engine, `krl diff`, Gate 1/2 & census explanations, `krl calendar`, `krl detect` | ✅ **Completed** |
+| **Milestone 7** | Automation & Hardening | CI/CD test automation, scheduled cron captures, release distribution | 🟡 **Next Up** |
 
 ---
 
