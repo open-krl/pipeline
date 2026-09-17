@@ -1,0 +1,144 @@
+{
+  "train_id": "1037",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:28:04Z",
+      "payload_hash": "dc87b732e74c2b17801071db0e3658a32b0df31cef76db0653c205f2566877e7",
+      "stops": [
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "DP",
+          "station_name": "DEPOK",
+          "time_est": "15:49:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "DPB",
+          "station_name": "DEPOK BARU",
+          "time_est": "15:53:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "POC",
+          "station_name": "PONDOK CINA",
+          "time_est": "15:55:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "UI",
+          "station_name": "UNIV. INDONESIA",
+          "time_est": "16:00:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "UP",
+          "station_name": "UNIV. PANCASILA",
+          "time_est": "16:02:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "LNA",
+          "station_name": "LENTENG AGUNG",
+          "time_est": "16:03:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "TNT",
+          "station_name": "TANJUNG BARAT",
+          "time_est": "16:05:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "PSM",
+          "station_name": "PASAR MINGGU",
+          "time_est": "16:14:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "PSMB",
+          "station_name": "PASAR MINGGU BARU",
+          "time_est": "16:16:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "DRN",
+          "station_name": "DUREN KALIBATA",
+          "time_est": "16:17:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "CW",
+          "station_name": "CAWANG",
+          "time_est": "16:18:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "TEB",
+          "station_name": "TEBET",
+          "time_est": "16:20:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1037",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "MRI",
+          "station_name": "MANGGARAI",
+          "time_est": "16:27:00",
+          "transit_station": true,
+          "color": "#E30A16",
+          "transit": [
+            "#0000ff",
+            "#ff0000"
+          ]
+        }
+      ]
+    }
+  }
+}

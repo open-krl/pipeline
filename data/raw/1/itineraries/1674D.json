@@ -1,0 +1,214 @@
+{
+  "train_id": "1674D",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:23:22Z",
+      "payload_hash": "571b424e5727a666e83c96fb0f5412c9dc286184990dbf3b14766ec8e2683089",
+      "stops": [
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "THB",
+          "station_name": "TANAH ABANG",
+          "time_est": "10:13:00",
+          "transit_station": true,
+          "color": "#16812B",
+          "transit": [
+            "#008000",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "PLM",
+          "station_name": "PALMERAH",
+          "time_est": "10:19:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "KBY",
+          "station_name": "KEBAYORAN",
+          "time_est": "10:25:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "PDJ",
+          "station_name": "PONDOK RANJI",
+          "time_est": "10:33:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "JMU",
+          "station_name": "JURANG MANGU",
+          "time_est": "10:35:30",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "SDM",
+          "station_name": "SUDIMARA",
+          "time_est": "10:39:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "RU",
+          "station_name": "RAWA BUNTU",
+          "time_est": "10:44:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "SRP",
+          "station_name": "SERPONG",
+          "time_est": "10:48:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "CSK",
+          "station_name": "CISAUK",
+          "time_est": "10:52:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "CC",
+          "station_name": "CICAYUR",
+          "time_est": "10:55:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "JTK",
+          "station_name": "JATAKE",
+          "time_est": "10:57:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "PRP",
+          "station_name": "PARUNG PANJANG",
+          "time_est": "11:04:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "CJT",
+          "station_name": "CILEJIT",
+          "time_est": "11:11:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "DAR",
+          "station_name": "DARU",
+          "time_est": "11:16:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "TEJ",
+          "station_name": "TENJO",
+          "time_est": "11:20:30",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "TGS",
+          "station_name": "TIGARAKSA",
+          "time_est": "11:25:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "CKY",
+          "station_name": "CIKOYA",
+          "time_est": "11:28:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "MJ",
+          "station_name": "MAJA",
+          "time_est": "11:32:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "CTR",
+          "station_name": "CITERAS",
+          "time_est": "11:41:00",
+          "transit_station": false,
+          "color": "#16812B",
+          "transit": ""
+        },
+        {
+          "train_id": "1674D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "RK",
+          "station_name": "RANGKASBITUNG",
+          "time_est": "11:52:00",
+          "transit_station": true,
+          "color": "#16812B",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

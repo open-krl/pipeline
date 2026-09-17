@@ -1,0 +1,170 @@
+{
+  "train_id": "5169D",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:15:03Z",
+      "payload_hash": "6b715a1f5601a93f66d43f02e4ceb29f5da7939f309b0974915e22cac55938e4",
+      "stops": [
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "TB",
+          "station_name": "TAMBUN",
+          "time_est": "19:01:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "BKST",
+          "station_name": "BEKASI TIMUR",
+          "time_est": "19:04:30",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "BKS",
+          "station_name": "BEKASI",
+          "time_est": "19:10:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KRI",
+          "station_name": "KRANJI",
+          "time_est": "19:12:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "CUK",
+          "station_name": "CAKUNG",
+          "time_est": "19:18:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KLDB",
+          "station_name": "KLENDER BARU",
+          "time_est": "19:20:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "BUA",
+          "station_name": "BUARAN",
+          "time_est": "19:21:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KLD",
+          "station_name": "KLENDER",
+          "time_est": "19:23:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "JNG",
+          "station_name": "JATINEGARA",
+          "time_est": "19:32:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "MRI",
+          "station_name": "MANGGARAI",
+          "time_est": "19:40:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#0000ff",
+            "#ff0000"
+          ]
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "SUD",
+          "station_name": "SUDIRMAN",
+          "time_est": "19:43:30",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KAT",
+          "station_name": "KARET",
+          "time_est": "19:45:30",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "THB",
+          "station_name": "TANAH ABANG",
+          "time_est": "19:52:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#008000",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "DU",
+          "station_name": "DURI",
+          "time_est": "19:58:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#d2691e",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "5169D",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "AK",
+          "station_name": "ANGKE",
+          "time_est": "20:03:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

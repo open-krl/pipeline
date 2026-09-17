@@ -1,0 +1,21 @@
+{
+  "train_id": "336",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:28:00Z",
+      "payload_hash": "c69d09e721e683a400e52f9d75edc8b4b3da6edf60542667b60eb06e902ab440",
+      "stops": [
+        {
+          "train_id": "336",
+          "ka_name": "COMMUTER LINE JATILUHUR",
+          "station_id": "CKR",
+          "station_name": "CIKARANG",
+          "time_est": "15:35:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

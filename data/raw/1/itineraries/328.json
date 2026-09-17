@@ -1,0 +1,21 @@
+{
+  "train_id": "328",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:27:51Z",
+      "payload_hash": "4d105c3a6b277d2393bdebdf7a5e61507fbbfa6eb7d7623edae1f01600c03d05",
+      "stops": [
+        {
+          "train_id": "328",
+          "ka_name": "COMMUTER LINE WALAHAR",
+          "station_id": "CKR",
+          "station_name": "CIKARANG",
+          "time_est": "07:48:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "train_id": "2263A",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:01:03Z",
+      "payload_hash": "c93e9118e35b239197d5145e74ac6bdf37f4155a868c2165f6e5b02e21d1ef40",
+      "stops": [
+        {
+          "train_id": "2263A",
+          "ka_name": "COMMUTER LINE TANJUNGPRIUK",
+          "station_id": "TPK",
+          "station_name": "TANJUNG PRIOK",
+          "time_est": "20:29:00",
+          "transit_station": false,
+          "color": "#DD0067",
+          "transit": ""
+        },
+        {
+          "train_id": "2263A",
+          "ka_name": "COMMUTER LINE TANJUNGPRIUK",
+          "station_id": "JIS",
+          "station_name": "JIS",
+          "time_est": "20:34:00",
+          "transit_station": false,
+          "color": "#DD0067",
+          "transit": ""
+        },
+        {
+          "train_id": "2263A",
+          "ka_name": "COMMUTER LINE TANJUNGPRIUK",
+          "station_id": "AC",
+          "station_name": "ANCOL",
+          "time_est": "20:38:00",
+          "transit_station": false,
+          "color": "#DD0067",
+          "transit": ""
+        },
+        {
+          "train_id": "2263A",
+          "ka_name": "COMMUTER LINE TANJUNGPRIUK",
+          "station_id": "KPB",
+          "station_name": "KAMPUNG BANDAN",
+          "time_est": "20:42:00",
+          "transit_station": true,
+          "color": "#DD0067",
+          "transit": [
+            "#ff8095",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "2263A",
+          "ka_name": "COMMUTER LINE TANJUNGPRIUK",
+          "station_id": "JAKK",
+          "station_name": "JAKARTA KOTA",
+          "time_est": "20:46:00",
+          "transit_station": true,
+          "color": "#DD0067",
+          "transit": [
+            "#ff0000",
+            "#ff8095"
+          ]
+        }
+      ]
+    }
+  }
+}

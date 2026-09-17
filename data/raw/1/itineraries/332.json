@@ -1,0 +1,21 @@
+{
+  "train_id": "332",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:28:00Z",
+      "payload_hash": "3dfcf5b86e96e925b1e7e725f471c6745512c80d3b9330f8e566da891631879b",
+      "stops": [
+        {
+          "train_id": "332",
+          "ka_name": "COMMUTER LINE WALAHAR",
+          "station_id": "CKR",
+          "station_name": "CIKARANG",
+          "time_est": "13:26:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

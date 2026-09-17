@@ -1,0 +1,61 @@
+{
+  "train_id": "D1/R1438-1",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:20:05Z",
+      "payload_hash": "89f1a17dfb8b06c801d02c8e8d331cd0220e7d4582a0f5c7ded4c17989ca8b69",
+      "stops": [
+        {
+          "train_id": "D1/R1438-1",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "BOO",
+          "station_name": "BOGOR",
+          "time_est": "23:05:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "D1/R1438-1",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "CLT",
+          "station_name": "CILEBUT",
+          "time_est": "23:13:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "D1/R1438-1",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "BJD",
+          "station_name": "BOJONGGEDE",
+          "time_est": "23:18:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "D1/R1438-1",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "CTA",
+          "station_name": "CITAYAM",
+          "time_est": "23:24:00",
+          "transit_station": true,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "D1/R1438-1",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "DP",
+          "station_name": "DEPOK",
+          "time_est": "23:30:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

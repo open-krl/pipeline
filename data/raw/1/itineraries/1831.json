@@ -1,0 +1,101 @@
+{
+  "train_id": "1831",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:26:35Z",
+      "payload_hash": "64b1afe561df4622c698c7e279e3819e6e40fecb45b5f48ed0a9fac22479d935",
+      "stops": [
+        {
+          "train_id": "1831",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "RK",
+          "station_name": "RANGKASBITUNG",
+          "time_est": "23:32:00",
+          "transit_station": true,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1831",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "CTR",
+          "station_name": "CITERAS",
+          "time_est": "23:44:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1831",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "MJ",
+          "station_name": "MAJA",
+          "time_est": "23:53:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1831",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "CKY",
+          "station_name": "CIKOYA",
+          "time_est": "23:55:30",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1831",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "TGS",
+          "station_name": "TIGARAKSA",
+          "time_est": "00:00:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1831",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "TEJ",
+          "station_name": "TENJO",
+          "time_est": "00:03:30",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1831",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "DAR",
+          "station_name": "DARU",
+          "time_est": "00:09:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1831",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "CJT",
+          "station_name": "CILEJIT",
+          "time_est": "00:12:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1831",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "PRP",
+          "station_name": "PARUNG PANJANG",
+          "time_est": "00:21:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

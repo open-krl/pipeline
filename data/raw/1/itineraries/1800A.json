@@ -1,0 +1,94 @@
+{
+  "train_id": "1800A",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:29:12Z",
+      "payload_hash": "8953333e77f91c367b0338327e6f1c960e48f0b4ef76969f4de1bbc4e1229667",
+      "stops": [
+        {
+          "train_id": "1800A",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "THB",
+          "station_name": "TANAH ABANG",
+          "time_est": "21:30:00",
+          "transit_station": true,
+          "color": "#93ca3e",
+          "transit": [
+            "#008000",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "1800A",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "PLM",
+          "station_name": "PALMERAH",
+          "time_est": "21:36:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1800A",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "KBY",
+          "station_name": "KEBAYORAN",
+          "time_est": "21:42:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1800A",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "PDJ",
+          "station_name": "PONDOK RANJI",
+          "time_est": "21:50:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1800A",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "JMU",
+          "station_name": "JURANG MANGU",
+          "time_est": "21:52:30",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1800A",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "SDM",
+          "station_name": "SUDIMARA",
+          "time_est": "21:56:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1800A",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "RU",
+          "station_name": "RAWA BUNTU",
+          "time_est": "22:01:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "1800A",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "SRP",
+          "station_name": "SERPONG",
+          "time_est": "22:05:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

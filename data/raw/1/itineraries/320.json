@@ -1,0 +1,121 @@
+{
+  "train_id": "320",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:27:42Z",
+      "payload_hash": "7884fe78ea8c08ca01acfaad17f897eba841819071217c3a746531ce490e35ab",
+      "stops": [
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "RK",
+          "station_name": "RANGKASBITUNG",
+          "time_est": "10:10:00",
+          "transit_station": true,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "JBU",
+          "station_name": "JAMBU BARU",
+          "time_est": "10:21:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "CT",
+          "station_name": "CATANG",
+          "time_est": "10:29:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "CKL",
+          "station_name": "CIKEUSAL",
+          "time_est": "10:40:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "WLT",
+          "station_name": "WALANTAKA",
+          "time_est": "10:52:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "SG",
+          "station_name": "SERANG",
+          "time_est": "11:03:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "KRA",
+          "station_name": "KARANGANTU",
+          "time_est": "11:15:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "TOJB",
+          "station_name": "TONJONG BARU",
+          "time_est": "11:24:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "CLG",
+          "station_name": "CILEGON",
+          "time_est": "11:35:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "KEN",
+          "station_name": "KRENCENG",
+          "time_est": "11:43:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        },
+        {
+          "train_id": "320",
+          "ka_name": "COMMUTERLINE MERAK",
+          "station_id": "MER",
+          "station_name": "MERAK",
+          "time_est": "11:55:00",
+          "transit_station": false,
+          "color": "#93ca3e",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

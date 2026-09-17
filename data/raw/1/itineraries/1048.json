@@ -1,0 +1,184 @@
+{
+  "train_id": "1048",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:09:53Z",
+      "payload_hash": "40371a24627d1b3a8d2acb8790eb8ef4a7484f1ba2ee07da6b702e6e9dd3b7d9",
+      "stops": [
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "MRI",
+          "station_name": "MANGGARAI",
+          "time_est": "18:25:00",
+          "transit_station": true,
+          "color": "#E30A16",
+          "transit": [
+            "#0000ff",
+            "#ff0000"
+          ]
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "TEB",
+          "station_name": "TEBET",
+          "time_est": "18:28:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "CW",
+          "station_name": "CAWANG",
+          "time_est": "18:30:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "DRN",
+          "station_name": "DUREN KALIBATA",
+          "time_est": "18:32:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "PSMB",
+          "station_name": "PASAR MINGGU BARU",
+          "time_est": "18:33:30",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "PSM",
+          "station_name": "PASAR MINGGU",
+          "time_est": "18:39:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "TNT",
+          "station_name": "TANJUNG BARAT",
+          "time_est": "18:42:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "LNA",
+          "station_name": "LENTENG AGUNG",
+          "time_est": "18:44:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "UP",
+          "station_name": "UNIV. PANCASILA",
+          "time_est": "18:45:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "UI",
+          "station_name": "UNIV. INDONESIA",
+          "time_est": "18:52:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "POC",
+          "station_name": "PONDOK CINA",
+          "time_est": "18:54:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "DPB",
+          "station_name": "DEPOK BARU",
+          "time_est": "18:58:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "DP",
+          "station_name": "DEPOK",
+          "time_est": "19:03:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "CTA",
+          "station_name": "CITAYAM",
+          "time_est": "19:09:00",
+          "transit_station": true,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "BJD",
+          "station_name": "BOJONGGEDE",
+          "time_est": "19:15:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "CLT",
+          "station_name": "CILEBUT",
+          "time_est": "19:21:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "1048",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "BOO",
+          "station_name": "BOGOR",
+          "time_est": "19:29:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

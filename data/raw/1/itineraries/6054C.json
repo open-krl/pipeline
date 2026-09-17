@@ -1,0 +1,226 @@
+{
+  "train_id": "6054C",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:04:39Z",
+      "payload_hash": "d713fdec4239d4d6ca9332d85af66e963e45edb632b802e887be25e4b222284c",
+      "stops": [
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KPB",
+          "station_name": "KAMPUNG BANDAN",
+          "time_est": "17:09:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#ff8095",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "AK",
+          "station_name": "ANGKE",
+          "time_est": "17:18:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "DU",
+          "station_name": "DURI",
+          "time_est": "17:22:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#d2691e",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "THB",
+          "station_name": "TANAH ABANG",
+          "time_est": "17:28:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#008000",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "SUDB",
+          "station_name": "SUDIRMAN BARU",
+          "time_est": "17:31:30",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#2D2B70",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "SUD",
+          "station_name": "SUDIRMAN",
+          "time_est": "17:32:30",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "MRI",
+          "station_name": "MANGGARAI",
+          "time_est": "17:44:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#0000ff",
+            "#ff0000"
+          ]
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "MTR",
+          "station_name": "MATRAMAN",
+          "time_est": "17:46:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "JNG",
+          "station_name": "JATINEGARA",
+          "time_est": "17:51:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KLD",
+          "station_name": "KLENDER",
+          "time_est": "17:55:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "BUA",
+          "station_name": "BUARAN",
+          "time_est": "17:57:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KLDB",
+          "station_name": "KLENDER BARU",
+          "time_est": "17:58:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "CUK",
+          "station_name": "CAKUNG",
+          "time_est": "18:04:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KRI",
+          "station_name": "KRANJI",
+          "time_est": "18:07:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "BKS",
+          "station_name": "BEKASI",
+          "time_est": "18:14:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "BKST",
+          "station_name": "BEKASI TIMUR",
+          "time_est": "18:17:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "TB",
+          "station_name": "TAMBUN",
+          "time_est": "18:23:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "CIT",
+          "station_name": "CIBITUNG",
+          "time_est": "18:26:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "TLM",
+          "station_name": "METLAND TELAGAMURNI",
+          "time_est": "18:28:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "6054C",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "CKR",
+          "station_name": "CIKARANG",
+          "time_est": "18:35:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

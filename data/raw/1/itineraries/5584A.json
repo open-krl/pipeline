@@ -1,0 +1,144 @@
+{
+  "train_id": "5584A",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:21:16Z",
+      "payload_hash": "1faeaaae68a64dced62551deea2df171229f1473619a1eea06971c5ef6f093c2",
+      "stops": [
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KPB",
+          "station_name": "KAMPUNG BANDAN",
+          "time_est": "22:43:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#ff8095",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "RJW",
+          "station_name": "RAJAWALI",
+          "time_est": "22:45:30",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KMO",
+          "station_name": "KEMAYORAN",
+          "time_est": "22:51:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "GST",
+          "station_name": "GANG SENTIONG",
+          "time_est": "22:56:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KMT",
+          "station_name": "KRAMAT",
+          "time_est": "22:57:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "POK",
+          "station_name": "PONDOK JATI",
+          "time_est": "22:59:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "JNG",
+          "station_name": "JATINEGARA",
+          "time_est": "23:07:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KLD",
+          "station_name": "KLENDER",
+          "time_est": "23:11:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "BUA",
+          "station_name": "BUARAN",
+          "time_est": "23:13:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KLDB",
+          "station_name": "KLENDER BARU",
+          "time_est": "23:14:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "CUK",
+          "station_name": "CAKUNG",
+          "time_est": "23:19:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "KRI",
+          "station_name": "KRANJI",
+          "time_est": "23:22:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "5584A",
+          "ka_name": "COMMUTER LINE CIKARANG",
+          "station_id": "BKS",
+          "station_name": "BEKASI",
+          "time_est": "23:26:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

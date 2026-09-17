@@ -1,0 +1,124 @@
+{
+  "train_id": "1998A",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:19:08Z",
+      "payload_hash": "021ae692ce01f5d0c3a5a9f209c5e0d1ce1d28567be53a5cd0b71e1fb0ee32ab",
+      "stops": [
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "DU",
+          "station_name": "DURI",
+          "time_est": "19:24:00",
+          "transit_station": true,
+          "color": "#623814",
+          "transit": [
+            "#d2691e",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "GRG",
+          "station_name": "GROGOL",
+          "time_est": "19:27:00",
+          "transit_station": false,
+          "color": "#623814",
+          "transit": ""
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "PSG",
+          "station_name": "PESING",
+          "time_est": "19:29:00",
+          "transit_station": false,
+          "color": "#623814",
+          "transit": ""
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "TKO",
+          "station_name": "TAMAN KOTA",
+          "time_est": "19:31:00",
+          "transit_station": false,
+          "color": "#623814",
+          "transit": ""
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "BOI",
+          "station_name": "BOJONG INDAH",
+          "time_est": "19:33:00",
+          "transit_station": false,
+          "color": "#623814",
+          "transit": ""
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "RW",
+          "station_name": "RAWA BUAYA",
+          "time_est": "19:36:00",
+          "transit_station": false,
+          "color": "#623814",
+          "transit": ""
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "KDS",
+          "station_name": "KALIDERES",
+          "time_est": "19:38:00",
+          "transit_station": false,
+          "color": "#623814",
+          "transit": ""
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "PI",
+          "station_name": "PORIS",
+          "time_est": "19:40:30",
+          "transit_station": false,
+          "color": "#623814",
+          "transit": ""
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "BPR",
+          "station_name": "BATU CEPER",
+          "time_est": "19:44:00",
+          "transit_station": true,
+          "color": "#623814",
+          "transit": ""
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "THI",
+          "station_name": "TANAH TINGGI",
+          "time_est": "19:47:00",
+          "transit_station": false,
+          "color": "#623814",
+          "transit": ""
+        },
+        {
+          "train_id": "1998A",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "TNG",
+          "station_name": "TANGERANG",
+          "time_est": "19:50:00",
+          "transit_station": false,
+          "color": "#623814",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

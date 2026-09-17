@@ -1,0 +1,97 @@
+{
+  "train_id": "R1207-2",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:28:54Z",
+      "payload_hash": "c2e024c4ccf7724919128146c32092e4ee9756816dccb4e225e42c09f7256a4f",
+      "stops": [
+        {
+          "train_id": "R1207-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "JAKK",
+          "station_name": "JAKARTA KOTA",
+          "time_est": "08:31:00",
+          "transit_station": true,
+          "color": "#E30A16",
+          "transit": [
+            "#ff0000",
+            "#ff8095"
+          ]
+        },
+        {
+          "train_id": "R1207-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "JAY",
+          "station_name": "JAYAKARTA",
+          "time_est": "08:34:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "R1207-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "MGB",
+          "station_name": "MANGGA BESAR",
+          "time_est": "08:36:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "R1207-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "SW",
+          "station_name": "SAWAH BESAR",
+          "time_est": "08:38:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "R1207-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "JUA",
+          "station_name": "JUANDA",
+          "time_est": "08:40:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "R1207-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "GDD",
+          "station_name": "GONDANGDIA",
+          "time_est": "08:46:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "R1207-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "CKI",
+          "station_name": "CIKINI",
+          "time_est": "08:49:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "R1207-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "MRI",
+          "station_name": "MANGGARAI",
+          "time_est": "08:54:00",
+          "transit_station": true,
+          "color": "#E30A16",
+          "transit": [
+            "#0000ff",
+            "#ff0000"
+          ]
+        }
+      ]
+    }
+  }
+}

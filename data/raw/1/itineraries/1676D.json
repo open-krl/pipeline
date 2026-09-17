@@ -1,0 +1,60 @@
+{
+  "train_id": "1676D",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:29:11Z",
+      "payload_hash": "fd6a2f93c82a1bfa12fd3056cbe3b0f6a2948cff858e591e8854a622949c8a9a",
+      "stops": [
+        {
+          "train_id": "1676D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "THB",
+          "station_name": "TANAH ABANG",
+          "time_est": "10:17:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#008000",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "1676D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "SUDB",
+          "station_name": "SUDIRMAN BARU",
+          "time_est": "10:21:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#2D2B70",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "1676D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "SUD",
+          "station_name": "SUDIRMAN",
+          "time_est": "10:21:30",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "1676D",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "MRI",
+          "station_name": "MANGGARAI",
+          "time_est": "10:28:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#0000ff",
+            "#ff0000"
+          ]
+        }
+      ]
+    }
+  }
+}

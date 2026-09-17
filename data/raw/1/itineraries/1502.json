@@ -1,0 +1,61 @@
+{
+  "train_id": "1502",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:21:19Z",
+      "payload_hash": "30d38ef3e194323b9e5b85e2822fa6b89d178a85d9ef0c9214ef2c9ec75a5e9c",
+      "stops": [
+        {
+          "train_id": "1502",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "DP",
+          "station_name": "DEPOK",
+          "time_est": "05:12:00",
+          "transit_station": false,
+          "color": "#F76114",
+          "transit": ""
+        },
+        {
+          "train_id": "1502",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "CTA",
+          "station_name": "CITAYAM",
+          "time_est": "05:19:00",
+          "transit_station": true,
+          "color": "#F76114",
+          "transit": ""
+        },
+        {
+          "train_id": "1502",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "PDRG",
+          "station_name": "PONDOK RAJEG",
+          "time_est": "05:23:00",
+          "transit_station": false,
+          "color": "#F76114",
+          "transit": ""
+        },
+        {
+          "train_id": "1502",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "CBN",
+          "station_name": "CIBINONG",
+          "time_est": "05:32:00",
+          "transit_station": false,
+          "color": "#F76114",
+          "transit": ""
+        },
+        {
+          "train_id": "1502",
+          "ka_name": "COMMUTER LINE BOGOR",
+          "station_id": "NMO",
+          "station_name": "NAMBO",
+          "time_est": "05:42:00",
+          "transit_station": false,
+          "color": "#F76114",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,83 @@
+{
+  "train_id": "1727E",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:28:49Z",
+      "payload_hash": "27a50b060355c5c8aaeecdd23758a5102c14cd7654c27bacd87f6f3071b48a20",
+      "stops": [
+        {
+          "train_id": "1727E",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "MRI",
+          "station_name": "MANGGARAI",
+          "time_est": "14:04:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#0000ff",
+            "#ff0000"
+          ]
+        },
+        {
+          "train_id": "1727E",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "SUD",
+          "station_name": "SUDIRMAN",
+          "time_est": "14:08:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        },
+        {
+          "train_id": "1727E",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "SUDB",
+          "station_name": "SUDIRMAN BARU",
+          "time_est": "14:08:30",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#2D2B70",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "1727E",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "THB",
+          "station_name": "TANAH ABANG",
+          "time_est": "14:16:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#008000",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "1727E",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "DU",
+          "station_name": "DURI",
+          "time_est": "14:22:00",
+          "transit_station": true,
+          "color": "#0084D8",
+          "transit": [
+            "#d2691e",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "1727E",
+          "ka_name": "COMMUTER LINE RANGKASBITUNG",
+          "station_id": "AK",
+          "station_name": "ANGKE",
+          "time_est": "14:26:00",
+          "transit_station": false,
+          "color": "#0084D8",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}

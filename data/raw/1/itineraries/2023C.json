@@ -1,0 +1,73 @@
+{
+  "train_id": "2023C",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:29:12Z",
+      "payload_hash": "c6302026f59345965496f143b1a8301653c0c2d5eb76d1018c6f0d3aa94fd04e",
+      "stops": [
+        {
+          "train_id": "2023C",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "MRI",
+          "station_name": "MANGGARAI",
+          "time_est": "23:15:00",
+          "transit_station": true,
+          "color": "#F76114",
+          "transit": [
+            "#0000ff",
+            "#ff0000"
+          ]
+        },
+        {
+          "train_id": "2023C",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "SUD",
+          "station_name": "SUDIRMAN",
+          "time_est": "23:19:30",
+          "transit_station": false,
+          "color": "#F76114",
+          "transit": ""
+        },
+        {
+          "train_id": "2023C",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "SUDB",
+          "station_name": "SUDIRMAN BARU",
+          "time_est": "23:20:30",
+          "transit_station": true,
+          "color": "#F76114",
+          "transit": [
+            "#2D2B70",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "2023C",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "THB",
+          "station_name": "TANAH ABANG",
+          "time_est": "23:28:00",
+          "transit_station": true,
+          "color": "#F76114",
+          "transit": [
+            "#008000",
+            "#0000ff"
+          ]
+        },
+        {
+          "train_id": "2023C",
+          "ka_name": "COMMUTER LINE TANGERANG",
+          "station_id": "DU",
+          "station_name": "DURI",
+          "time_est": "23:35:00",
+          "transit_station": true,
+          "color": "#F76114",
+          "transit": [
+            "#d2691e",
+            "#0000ff"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "train_id": "R1187-2",
+  "observations": {
+    "weekday": {
+      "fetched_at": "2026-09-17T00:28:35Z",
+      "payload_hash": "60bf08c787a5ca9296838151d4b994310d7d26c69018d4437ab6dd1eb06dfc30",
+      "stops": [
+        {
+          "train_id": "R1187-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "DP",
+          "station_name": "DEPOK",
+          "time_est": "05:38:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "R1187-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "CTA",
+          "station_name": "CITAYAM",
+          "time_est": "05:44:00",
+          "transit_station": true,
+          "color": "#E30A16",
+          "transit": ""
+        },
+        {
+          "train_id": "R1187-2",
+          "ka_name": "DINAS RANGKAIAN KRL",
+          "station_id": "BJD",
+          "station_name": "BOJONGGEDE",
+          "time_est": "05:49:00",
+          "transit_station": false,
+          "color": "#E30A16",
+          "transit": ""
+        }
+      ]
+    }
+  }
+}
