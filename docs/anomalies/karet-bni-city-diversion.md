@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-During Stage 3 database compilation (`krl build 1`) for Timetable Version 1 (captured September 17, 2026), **1,138 trips** compiled with full itinerary fidelity, while exactly **one passenger trip**—train `5169D`—was flagged by Invariant 9 (Station Referential Integrity) and fell back to topological board reconstruction.
+During the initial Stage 3 database compilation (`krl build 1`) for Timetable Version 1 (captured September 17, 2026), **1,138 trips** compiled with full itinerary fidelity, while exactly **one passenger trip**—train `5169D`—was flagged by Invariant 9 (Station Referential Integrity) and fell back to topological board reconstruction (prior to adding the `KAT` $\to$ `SUDB` override, which brought the final tally to 1,139).
 
 Investigation revealed an upstream API database migration glitch caused by a real-world physical operational diversion enacted by KAI Commuter on **September 1, 2026**.
 
@@ -10,18 +10,18 @@ Investigation revealed an upstream API database migration glitch caused by a rea
 
 ## 1. Corridor Geography & Physical Context
 
-On the Commuter Line Cikarang corridor between Manggarai and Tanah Abang, trains traverse the following sequential stations:
+On the Commuter Line Cikarang corridor between Manggarai and Tanah Abang, trains traverse the following sequential stations (chainage follows official KAI railway kilometrage originating at Tanah Abang, km 0+000):
 
 ```
-[MRI] Manggarai (km 0+000)
-  │
-[SUD] Sudirman (km 1+846)
-  │ (~400m)
-[SUDB] Sudirman Baru / BNI City (km 2+450)
-  │ (~450m)
-[KAT] Karet (km 2+014)
-  │ (~2,000m)
-[THB] Tanah Abang (km 4+048)
+[MRI] Manggarai (km 4+048)
+  │ (~867m)
+[SUD] Sudirman (km 3+181)
+  │ (~681m)
+[SUDB] Sudirman Baru / BNI City (km 2+500)
+  │ (~474m)
+[KAT] Karet (km 2+026)
+  │ (~2,026m)
+[THB] Tanah Abang (km 0+000)
 ```
 
 Historically, regular suburban Commuter Line trains called at **Stasiun Karet (`KAT`)**, while **Stasiun BNI City (`SUDB`)** served exclusively as the premium Soekarno-Hatta Airport Rail Link terminal. In late 2022, KAI Commuter began allowing select KRL trains to stop at BNI City, but Karet remained the primary local commuter stop.
@@ -78,7 +78,7 @@ In KCI's train itinerary backend (`/api/krl/train-schedule`):
 
 ## 4. Pipeline Impact & Invariant Enforcement
 
-Because `KAT` was omitted from `stations.json` (due to Defect #1), `validStationIds` contained only the 114 operational stations.
+Because `KAT` was omitted from `stations.json` (due to Defect #1), `validStationIds` contained only the 111 operational stations (the 114 entries in `stations.json` minus the 3 non-station `WIL*` region group headers).
 
 When `fold.ts` processed `5169D`:
 1. Itinerary stop #12 requested `station_id: "KAT"`.
