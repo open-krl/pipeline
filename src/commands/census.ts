@@ -457,6 +457,7 @@ export async function executeCensus(
 	} else if (!logger) {
 		logger = new StructuredLogger();
 	}
+	logFilePath = logger.logFilePath;
 
 	const client = options.client ?? new KciClient({ logger });
 
@@ -672,8 +673,6 @@ export async function executeCensus(
 		}),
 	);
 
-	const durationSecs = timer.elapsedSecs;
-
 	// 7. Optional Git Commit
 	let commitResult: CommitCensusResult | undefined;
 	if (options.commit) {
@@ -685,6 +684,9 @@ export async function executeCensus(
 			failedCount,
 		});
 	}
+
+	const durationSecs = timer.elapsedSecs;
+	const durationMs = timer.elapsedMs;
 
 	logger.info(
 		"census",
@@ -700,7 +702,7 @@ export async function executeCensus(
 			notFoundCount,
 			failedCount,
 			durationSecs,
-			durationMs: timer.elapsedMs,
+			durationMs,
 		},
 	);
 

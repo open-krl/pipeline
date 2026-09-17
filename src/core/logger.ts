@@ -105,15 +105,22 @@ export class StructuredLogger {
 		// 2. File Output (if logFilePath configured and meets threshold)
 		if (this.logFilePath && this.shouldLog(level, this.minLevel)) {
 			const entry: LogEntry = {
+				...data,
 				timestamp,
 				level,
 				scope,
 				event,
 				message,
-				...data,
 			};
 
-			const line = JSON.stringify(entry);
+			let line: string;
+			try {
+				line = JSON.stringify(entry);
+			} catch (err) {
+				console.warn("[Logger Warning] Failed to serialize log entry:", err);
+				return;
+			}
+
 			this.appendLine(line);
 		}
 	}

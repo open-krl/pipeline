@@ -168,13 +168,21 @@ export class KciClient {
 							`${detail} on ${request.url} - retrying (attempt ${retryCount}/${this.maxRetries})...`,
 						);
 
-						this.logger?.warn("api", "retry", `${detail} on ${request.url}`, {
-							url: request.url,
-							retryCount,
-							maxRetries: this.maxRetries,
-							status: isHTTPError(error) ? error.response.status : undefined,
-							error: error instanceof Error ? error.message : String(error),
-						});
+						this.logger?.warn(
+							"api",
+							"retry_attempt",
+							`${detail} on ${request.url}`,
+							{
+								url: request.url,
+								retryCount,
+								maxRetries: this.maxRetries,
+								delayMs: Math.round(
+									this.retryBaseMs * this.retryFactor ** (retryCount - 1),
+								),
+								status: isHTTPError(error) ? error.response.status : undefined,
+								error: error instanceof Error ? error.message : String(error),
+							},
+						);
 					},
 				],
 			},

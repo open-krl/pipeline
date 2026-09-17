@@ -131,7 +131,43 @@ describe("src/core/logger", () => {
 		await new Promise((r) => setTimeout(r, 25));
 
 		expect(timer.elapsedMs).toBeGreaterThanOrEqual(20);
-		expect(Number.parseFloat(timer.elapsedSecs)).toBeGreaterThanOrEqual(0.0);
+		expect(timer.elapsedMs).toBeLessThan(10000);
+		expect(timer.elapsedSecs).toMatch(/^\d+\.\d$/);
+	});
+
+	it("preserves logger-owned fields when metadata collides with schema keys", async () => {
+		const logFile = path.join(TEST_LOG_DIR, "reserved.jsonl");
+		const logger = new StructuredLogger({ logFilePath: logFile });
+
+		logger.info("test_scope", "valid_event", "Message", {
+			level: "error",
+			scope: "overwritten_scope",
+			event: "overwritten_event",
+			customField: "preserved",
+		});
+
+		await logger.flush();
+
+		const content = await fs.readFile(logFile, "utf-8");
+		const entry: LogEntry = JSON.parse(content.trim());
+		expect(entry.level).toBe("info");
+		expect(entry.scope).toBe("test_scope");
+		expect(entry.event).toBe("valid_event");
+		expect(entry.customField).toBe("preserved");
+	});
+
+	it("gracefully ignores non-serializable metadata without throwing", async () => {
+		const logFile = path.join(TEST_LOG_DIR, "circular.jsonl");
+		const logger = new StructuredLogger({ logFilePath: logFile });
+
+		const circular: Record<string, unknown> = {};
+		circular.self = circular;
+
+		expect(() => {
+			logger.info("test", "circular_event", "Should not throw", circular);
+		}).not.toThrow();
+
+		await logger.flush();
 	});
 
 	it("generates structured default log path", () => {

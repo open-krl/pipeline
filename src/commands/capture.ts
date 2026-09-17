@@ -184,7 +184,6 @@ export function filterOperationalStations(
  */
 export function resolveCaptureContext(options: CaptureOptions) {
 	const dataDir = resolveSafePath(options.dataDir ?? "data/raw");
-	const client = options.client ?? new KciClient();
 	const regionScope = options.region ?? DEFAULT_REGION_SCOPE;
 	const now = options.now ?? new Date();
 	const prompt = options.promptFn ?? defaultPrompt;
@@ -206,6 +205,9 @@ export function resolveCaptureContext(options: CaptureOptions) {
 	} else if (!logger) {
 		logger = new StructuredLogger();
 	}
+	logFilePath = logger.logFilePath;
+
+	const client = options.client ?? new KciClient({ logger });
 
 	return {
 		dataDir,
@@ -702,7 +704,7 @@ export async function executeCapture(
 		totalStations: operationalStations.length,
 		successfulBoardsCount: boardsResult.boardsMap.size,
 		failedStations: boardsResult.failedStations,
-		durationSecs: boardsResult.durationSecs,
+		durationSecs: timer.elapsedSecs,
 	});
 
 	// 7. Optional Git Auto-Commit Integration
