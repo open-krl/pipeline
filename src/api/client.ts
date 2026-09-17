@@ -8,6 +8,7 @@ import {
 	PACING_MS,
 	RETRY,
 } from "../config";
+import type { StructuredLogger } from "../core/logger";
 import {
 	type DepartureBoardResponse,
 	DepartureBoardResponseSchema,
@@ -84,6 +85,7 @@ export interface KciClientOptions {
 	retryFactor?: number;
 	maxRetries?: number;
 	timeoutMs?: number;
+	logger?: StructuredLogger;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -112,6 +114,7 @@ export class KciClient {
 	readonly retryFactor: number;
 	readonly maxRetries: number;
 	readonly timeoutMs: number;
+	readonly logger?: StructuredLogger;
 
 	private readonly ky: Ky;
 
@@ -129,6 +132,7 @@ export class KciClient {
 		this.retryFactor = options.retryFactor ?? RETRY.factor;
 		this.maxRetries = options.maxRetries ?? RETRY.maxRetries;
 		this.timeoutMs = options.timeoutMs ?? 15000;
+		this.logger = options.logger;
 
 		this.ky = ky.create({
 			baseUrl: this.baseUrl,
@@ -162,6 +166,22 @@ export class KciClient {
 
 						console.warn(
 							`${detail} on ${request.url} - retrying (attempt ${retryCount}/${this.maxRetries})...`,
+						);
+
+						this.logger?.warn(
+							"api",
+							"retry_attempt",
+							`${detail} on ${request.url}`,
+							{
+								url: request.url,
+								retryCount,
+								maxRetries: this.maxRetries,
+								delayMs: Math.round(
+									this.retryBaseMs * this.retryFactor ** (retryCount - 1),
+								),
+								status: isHTTPError(error) ? error.response.status : undefined,
+								error: error instanceof Error ? error.message : String(error),
+							},
 						);
 					},
 				],

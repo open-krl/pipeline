@@ -13,6 +13,11 @@ import {
 } from "../api/schemas";
 import { payloadHash } from "../core/canonical";
 import { type CommitCensusResult, commitCensus } from "../core/git";
+import {
+	generateDefaultLogPath,
+	StructuredLogger,
+	startTimer,
+} from "../core/logger";
 import { resolveSafePath } from "../core/path";
 import { scanSnapshots, scanTimetableVersions } from "./capture";
 
@@ -34,6 +39,9 @@ export interface CensusOptions {
 	now?: Date;
 	commit?: boolean;
 	onProgress?: (progress: CensusProgress) => void;
+	logger?: StructuredLogger;
+	logFilePath?: string;
+	noLog?: boolean;
 }
 
 export interface CensusProgress {
@@ -73,6 +81,7 @@ export interface CensusResult {
 	stratifiedCheck?: StratifiedCheckResult;
 	failedTrains: Array<{ trainId: string; reason: string }>;
 	commitResult?: CommitCensusResult;
+	logFilePath?: string;
 }
 
 /**
@@ -386,8 +395,7 @@ export async function runStratifiedSpotCheck(params: {
 export async function executeCensus(
 	options: CensusOptions = {},
 ): Promise<CensusResult> {
-	const startTime = Date.now();
-	const client = options.client ?? new KciClient();
+	const timer = startTimer();
 	const safeDataDir = resolveSafePath(options.dataDir ?? "data/raw");
 
 	// 1. Resolve timetable version
@@ -433,6 +441,25 @@ export async function executeCensus(
 			);
 		}
 	}
+
+	let logger = options.logger;
+	let logFilePath = options.logFilePath;
+	if (!logger && !options.noLog) {
+		logFilePath =
+			options.logFilePath ??
+			generateDefaultLogPath("census", {
+				version,
+				dayType: targetDayType,
+				now: options.now,
+				baseDir: options.dataDir ? safeDataDir : undefined,
+			});
+		logger = new StructuredLogger({ logFilePath });
+	} else if (!logger) {
+		logger = new StructuredLogger();
+	}
+	logFilePath = logger.logFilePath;
+
+	const client = options.client ?? new KciClient({ logger });
 
 	const discoveredMap = await discoverTrainIds(
 		safeDataDir,
@@ -520,6 +547,15 @@ export async function executeCensus(
 		}
 	}
 
+	logger.info("census", "census_started", "Starting itinerary census crawl", {
+		version,
+		dayType: targetDayType,
+		totalDiscovered,
+		toProbeCount: trainsToProbe.length,
+		cachedCount,
+		logFilePath,
+	});
+
 	// 6. Concurrent, Paced Crawl
 	let successCount = 0;
 	let notFoundCount = 0;
@@ -530,6 +566,7 @@ export async function executeCensus(
 
 	await Promise.all(
 		trainsToProbe.map(async (trainId) => {
+			const probeTimer = startTimer();
 			let stops: ItineraryStop[] = [];
 			let hash = "";
 			let status: "ok" | "not_found" = "not_found";
@@ -572,6 +609,19 @@ export async function executeCensus(
 				}
 
 				completedSoFar++;
+				logger.info(
+					"census",
+					"train_probed",
+					`Train ${trainId}: ${status === "ok" ? "OK" : "404 (Suspended)"}`,
+					{
+						trainId,
+						status,
+						stopCount: stops.length,
+						payloadHash: hash,
+						durationMs: probeTimer.elapsedMs,
+					},
+				);
+
 				if (options.onProgress) {
 					options.onProgress({
 						current: completedSoFar,
@@ -595,6 +645,17 @@ export async function executeCensus(
 				const reason = err instanceof Error ? err.message : String(err);
 				failedTrains.push({ trainId, reason });
 
+				logger.error(
+					"census",
+					"train_failed",
+					`Train ${trainId} probe failed: ${reason}`,
+					{
+						trainId,
+						reason,
+						durationMs: probeTimer.elapsedMs,
+					},
+				);
+
 				if (options.onProgress) {
 					options.onProgress({
 						current: completedSoFar,
@@ -612,8 +673,6 @@ export async function executeCensus(
 		}),
 	);
 
-	const durationSecs = ((Date.now() - startTime) / 1000).toFixed(1);
-
 	// 7. Optional Git Commit
 	let commitResult: CommitCensusResult | undefined;
 	if (options.commit) {
@@ -625,6 +684,29 @@ export async function executeCensus(
 			failedCount,
 		});
 	}
+
+	const durationSecs = timer.elapsedSecs;
+	const durationMs = timer.elapsedMs;
+
+	logger.info(
+		"census",
+		"census_completed",
+		"Itinerary census crawl completed",
+		{
+			version,
+			dayType: targetDayType,
+			totalDiscovered,
+			totalProbed: trainsToProbe.length,
+			cachedCount,
+			successCount,
+			notFoundCount,
+			failedCount,
+			durationSecs,
+			durationMs,
+		},
+	);
+
+	await logger.flush();
 
 	return {
 		version,
@@ -639,5 +721,6 @@ export async function executeCensus(
 		stratifiedCheck,
 		failedTrains,
 		commitResult,
+		logFilePath,
 	};
 }

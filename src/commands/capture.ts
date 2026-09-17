@@ -22,6 +22,11 @@ import {
 import { formatDateWib, resolveDayType } from "../core/calendar";
 import { type CommitSnapshotResult, commitCaptureSnapshot } from "../core/git";
 import {
+	generateDefaultLogPath,
+	StructuredLogger,
+	startTimer,
+} from "../core/logger";
+import {
 	computeBoardResponseHash,
 	computeStationMasterHash,
 } from "../core/manifest";
@@ -40,6 +45,9 @@ export interface CaptureOptions {
 	promptFn?: (question: string, defaultYes?: boolean) => Promise<boolean>;
 	commit?: boolean;
 	noCommit?: boolean;
+	logger?: StructuredLogger;
+	logFilePath?: string;
+	noLog?: boolean;
 }
 
 export interface CaptureResult {
@@ -48,6 +56,7 @@ export interface CaptureResult {
 	snapshot_dir: string;
 	manifest: CaptureManifest;
 	commitResult?: CommitSnapshotResult;
+	logFilePath?: string;
 }
 
 export interface FailedStation {
@@ -175,13 +184,30 @@ export function filterOperationalStations(
  */
 export function resolveCaptureContext(options: CaptureOptions) {
 	const dataDir = resolveSafePath(options.dataDir ?? "data/raw");
-	const client = options.client ?? new KciClient();
 	const regionScope = options.region ?? DEFAULT_REGION_SCOPE;
 	const now = options.now ?? new Date();
 	const prompt = options.promptFn ?? defaultPrompt;
 	const holidays = loadHolidays(options.holidaysPath);
 	const snapshotDate = formatDateWib(now);
 	const resolvedDayType = options.dayType ?? resolveDayType(now, holidays);
+
+	let logger = options.logger;
+	let logFilePath = options.logFilePath;
+	if (!logger && !options.noLog) {
+		logFilePath =
+			options.logFilePath ??
+			generateDefaultLogPath("capture", {
+				dayType: resolvedDayType,
+				now,
+				baseDir: options.dataDir ? dataDir : undefined,
+			});
+		logger = new StructuredLogger({ logFilePath });
+	} else if (!logger) {
+		logger = new StructuredLogger();
+	}
+	logFilePath = logger.logFilePath;
+
+	const client = options.client ?? new KciClient({ logger });
 
 	return {
 		dataDir,
@@ -195,6 +221,8 @@ export function resolveCaptureContext(options: CaptureOptions) {
 		yes: Boolean(options.yes),
 		commit: options.commit,
 		noCommit: Boolean(options.noCommit),
+		logger,
+		logFilePath,
 	};
 }
 
@@ -285,6 +313,7 @@ export async function evaluateGate1(params: Gate1Params): Promise<Gate1Result> {
 export async function fetchDepartureBoards(
 	operationalStations: readonly StationItem[],
 	client: KciClient,
+	logger?: StructuredLogger,
 ): Promise<BoardFetchResult> {
 	const startTime = Date.now();
 	const boardsMap = new Map<string, DepartureBoardItem[]>();
@@ -295,6 +324,7 @@ export async function fetchDepartureBoards(
 
 	await Promise.all(
 		operationalStations.map(async (station) => {
+			const stationTimer = startTimer();
 			const resolvedId = resolveStationCode(station.sta_id);
 			try {
 				const schedule = await client.fetchStationSchedule(resolvedId);
@@ -306,6 +336,18 @@ export async function fetchDepartureBoards(
 				console.log(
 					`[${String(completedCount).padStart(2, " ")}/${totalStations}] OK    ${(station.sta_id + aliasInfo).padEnd(10, " ")} (${station.sta_name}) - ${schedule.data.length} departures`,
 				);
+				logger?.info(
+					"capture",
+					"station_fetched",
+					`Station ${station.sta_id} departures fetched`,
+					{
+						stationId: resolvedId,
+						originalStationId: station.sta_id,
+						stationName: station.sta_name,
+						departures: schedule.data.length,
+						durationMs: stationTimer.elapsedMs,
+					},
+				);
 			} catch (err) {
 				completedCount++;
 				const reason = err instanceof Error ? err.message : String(err);
@@ -316,6 +358,18 @@ export async function fetchDepartureBoards(
 				});
 				console.warn(
 					`[${String(completedCount).padStart(2, " ")}/${totalStations}] FAIL  ${station.sta_id.padEnd(5, " ")} (${station.sta_name}) - ${reason}`,
+				);
+				logger?.error(
+					"capture",
+					"station_failed",
+					`Station ${station.sta_id} failed: ${reason}`,
+					{
+						stationId: resolvedId,
+						originalStationId: station.sta_id,
+						stationName: station.sta_name,
+						reason,
+						durationMs: stationTimer.elapsedMs,
+					},
 				);
 			}
 		}),
@@ -527,6 +581,9 @@ export function printCaptureSummary(params: {
 		params.failedStations.length > 0
 			? ` (${params.failedStations.map((f) => `${f.id}: ${f.reason}`).join(", ")})`
 			: "";
+	const logStr = params.result.logFilePath
+		? `\nLog File:             ${params.result.logFilePath}`
+		: "";
 
 	console.log(`
 ── Capture Summary ──────────────────────────────────────────
@@ -538,7 +595,7 @@ Failed Stations:      ${params.failedStations.length}${failedStr}
 Duration:             ${params.durationSecs}s
 Station Master Hash:  ${params.result.manifest.station_master_hash.slice(0, 16)}...
 Board Response Hash:  ${params.result.manifest.board_response_hash.slice(0, 16)}...
-Saved to:             ${params.result.snapshot_dir}
+Saved to:             ${params.result.snapshot_dir}${logStr}
 ─────────────────────────────────────────────────────────────
 `);
 }
@@ -549,7 +606,20 @@ Saved to:             ${params.result.snapshot_dir}
 export async function executeCapture(
 	options: CaptureOptions = {},
 ): Promise<CaptureResult> {
+	const timer = startTimer();
 	const ctx = resolveCaptureContext(options);
+
+	ctx.logger.info(
+		"capture",
+		"capture_started",
+		"Starting departure board capture pipeline",
+		{
+			regionScope: ctx.regionScope,
+			dayType: ctx.resolvedDayType,
+			newVersion: ctx.newVersion,
+			logFilePath: ctx.logFilePath,
+		},
+	);
 
 	// 1. Fetch Station Master Catalog & Extract Operational Roster
 	const stationsResponse = await ctx.client.fetchStations();
@@ -569,10 +639,23 @@ export async function executeCapture(
 		prompt: ctx.prompt,
 	});
 
+	ctx.logger.info(
+		"capture",
+		"gate1_evaluated",
+		`Gate 1 evaluated: version ${gate1.versionToUse}`,
+		{
+			activeVersion: gate1.activeVersion,
+			versionToUse: gate1.versionToUse,
+			shouldBumpVersion: gate1.shouldBumpVersion,
+			stationMasterHash: currentStationMasterHash,
+		},
+	);
+
 	// 3. Paced Concurrent Board Fan-Out
 	const boardsResult = await fetchDepartureBoards(
 		operationalStations,
 		ctx.client,
+		ctx.logger,
 	);
 	const currentBoardResponseHash = computeBoardResponseHash(
 		boardsResult.boardsMap,
@@ -588,6 +671,17 @@ export async function executeCapture(
 		yes: ctx.yes,
 		prompt: ctx.prompt,
 	});
+
+	ctx.logger.info(
+		"capture",
+		"gate2_evaluated",
+		`Gate 2 evaluated: version ${gate2.versionToUse}`,
+		{
+			versionToUse: gate2.versionToUse,
+			shouldBumpVersion: gate2.shouldBumpVersion,
+			boardResponseHash: currentBoardResponseHash,
+		},
+	);
 
 	// 5. Atomic Disk Persistence
 	const result = await writeSnapshotToDisk({
@@ -606,11 +700,11 @@ export async function executeCapture(
 
 	// 6. Report Summary
 	printCaptureSummary({
-		result,
+		result: { ...result, logFilePath: ctx.logFilePath },
 		totalStations: operationalStations.length,
 		successfulBoardsCount: boardsResult.boardsMap.size,
 		failedStations: boardsResult.failedStations,
-		durationSecs: boardsResult.durationSecs,
+		durationSecs: timer.elapsedSecs,
 	});
 
 	// 7. Optional Git Auto-Commit Integration
@@ -632,8 +726,29 @@ export async function executeCapture(
 		}
 	}
 
+	ctx.logger.info(
+		"capture",
+		"capture_completed",
+		"Departure board capture completed successfully",
+		{
+			timetableVersion: result.timetable_version,
+			snapshotId: result.snapshot_id,
+			status: result.manifest.status,
+			totalStations: operationalStations.length,
+			successfulBoardsCount: boardsResult.boardsMap.size,
+			failedCount: boardsResult.failedStations.length,
+			durationSecs: timer.elapsedSecs,
+			durationMs: timer.elapsedMs,
+			stationMasterHash: result.manifest.station_master_hash,
+			boardResponseHash: result.manifest.board_response_hash,
+		},
+	);
+
+	await ctx.logger.flush();
+
 	return {
 		...result,
 		commitResult,
+		logFilePath: ctx.logFilePath,
 	};
 }
