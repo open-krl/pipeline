@@ -471,7 +471,7 @@ Compilation Time:   ${result.durationSecs}s
 		},
 		{
 			name: "calendar",
-			desc: "Update statutory holiday definitions (§10.2)",
+			desc: "Inspect three-way day-type set differences & schedule identity report (§9)",
 		},
 		{
 			name: "detect",
