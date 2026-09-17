@@ -10,7 +10,11 @@ import {
 	getDayOfWeekWib,
 	resolveDayType,
 } from "../../src/core/calendar";
-import { parseRouteName, resolveStationId } from "../../src/core/route";
+import {
+	cleanDestinationName,
+	parseRouteName,
+	resolveStationId,
+} from "../../src/core/route";
 import {
 	DEAD_BAND_CUTOFF_SECS,
 	parseHMS,
@@ -129,6 +133,7 @@ describe("src/core/route", () => {
 		{ sta_id: "CKR", sta_name: "CIKARANG" },
 		{ sta_id: "BKS", sta_name: "BEKASI" },
 		{ sta_id: "JAKK", sta_name: "JAKARTA KOTA" },
+		{ sta_id: "TPK", sta_name: "TANJUNG PRIOK" },
 	];
 
 	it("parses route name with VIA token", () => {
@@ -149,12 +154,24 @@ describe("src/core/route", () => {
 		});
 	});
 
+	it("cleans trailing bypass/via markers from destination string", () => {
+		expect(cleanDestinationName("CIKARANG VIA MRI")).toBe("CIKARANG");
+		expect(cleanDestinationName("KAMPUNGBANDAN VIA PSE")).toBe("KAMPUNGBANDAN");
+		expect(cleanDestinationName("BOGOR")).toBe("BOGOR");
+	});
+
 	it("resolves station IDs via whitespace-insensitive matching", () => {
 		expect(resolveStationId("KAMPUNGBANDAN", stations)).toBe("KPB");
 		expect(resolveStationId("KAMPUNG BANDAN", stations)).toBe("KPB");
 		expect(resolveStationId("CIKARANG", stations)).toBe("CKR");
 		expect(resolveStationId("JAKARTA KOTA", stations)).toBe("JAKK");
 		expect(resolveStationId("UNKNOWN", stations)).toBeNull();
+	});
+
+	it("resolves station IDs with bypass markers and transliterations", () => {
+		expect(resolveStationId("CIKARANG VIA MRI", stations)).toBe("CKR");
+		expect(resolveStationId("KAMPUNGBANDAN VIA PSE", stations)).toBe("KPB");
+		expect(resolveStationId("TANJUNGPRIUK", stations)).toBe("TPK");
 	});
 });
 
