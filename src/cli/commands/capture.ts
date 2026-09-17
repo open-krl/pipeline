@@ -75,7 +75,7 @@ export function registerCaptureCommand(cli: CAC): void {
 			console.log(`Saved snapshot to: ${result.snapshot_dir}`);
 
 			if (!commit && !noCommit && process.stdin.isTTY && !options.yes) {
-				if (await confirm("\nCommit snapshot to git repository? [Y/n] ")) {
+				if (await confirm("\nCommit snapshot to git repository?", true)) {
 					const commitResult = await commitCaptureSnapshot({
 						snapshotDir: result.snapshot_dir,
 						manifest: result.manifest,

@@ -243,7 +243,7 @@ export async function evaluateGate2(params: Gate2Params): Promise<Gate2Result> {
 				);
 			}
 
-			const promptMsg = `[Gate 2 Alert] Board signature differs for day type '${params.resolvedDayType}' compared to snapshot ${sameDayTypeSnapshot.id} (${existingHash.slice(0, 8)} -> ${params.currentBoardResponseHash.slice(0, 8)}).${diffSummary}\nCapture saved as provisional. Increment timetable version to ${params.versionToUse + 1}? [y/n/q - quit and inspect later]`;
+			const promptMsg = `[Gate 2 Alert] Board signature differs for day type '${params.resolvedDayType}' compared to snapshot ${sameDayTypeSnapshot.id} (${existingHash.slice(0, 8)} -> ${params.currentBoardResponseHash.slice(0, 8)}).${diffSummary}\nCapture saved as provisional. Increment timetable version to ${params.versionToUse + 1}?`;
 
 			const answer = await params.prompt(promptMsg, false);
 
