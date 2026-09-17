@@ -142,21 +142,57 @@ describe("src/cli — CAC architecture", () => {
 		expect(parsed.options.dbPath).toBe("custom.db");
 	});
 
-	it("executes milestone stub commands cleanly", async () => {
+	it("parses export positional version and flag options", () => {
+		const cli = createCli();
+		const parsed = cli.parse(
+			[
+				"bun",
+				"src/cli.ts",
+				"export",
+				"1",
+				"--db-path",
+				"data/custom.db",
+				"--out-dir",
+				"data/custom-out",
+				"--start-date",
+				"2026-09-16",
+				"--end-date",
+				"2026-12-31",
+				"--require-resolved-calendar",
+				"--require-census-complete",
+				"--require-holiday-coverage",
+				"--dump-csv",
+				"data/custom-csv",
+			],
+			{ run: false },
+		);
+
+		expect(cli.matchedCommand?.name).toBe("export");
+		expect(parsed.args[0]).toBe("1");
+		expect(parsed.options.dbPath).toBe("data/custom.db");
+		expect(parsed.options.outDir).toBe("data/custom-out");
+		expect(parsed.options.startDate).toBe("2026-09-16");
+		expect(parsed.options.endDate).toBe("2026-12-31");
+		expect(parsed.options.requireResolvedCalendar).toBe(true);
+		expect(parsed.options.requireCensusComplete).toBe(true);
+		expect(parsed.options.requireHolidayCoverage).toBe(true);
+		expect(parsed.options.dumpCsv).toBe("data/custom-csv");
+	});
+
+	it("executes remaining milestone stub commands cleanly", async () => {
 		const logs: string[] = [];
 		const origLog = console.log;
 		console.log = (msg: string) => logs.push(msg);
 
 		try {
-			for (const cmd of ["export", "calendar", "detect"]) {
+			for (const cmd of ["calendar", "detect"]) {
 				const cli = createCli();
 				cli.parse(["bun", "src/cli.ts", cmd], { run: false });
 				await cli.runMatchedCommand();
 			}
-			expect(logs.length).toBe(3);
-			expect(logs[0]).toContain("export");
-			expect(logs[1]).toContain("calendar");
-			expect(logs[2]).toContain("detect");
+			expect(logs.length).toBe(2);
+			expect(logs[0]).toContain("calendar");
+			expect(logs[1]).toContain("detect");
 		} finally {
 			console.log = origLog;
 		}
