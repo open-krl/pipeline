@@ -23,6 +23,23 @@ export function diffItineraries(
 		afterMap.set(stop.station_id, { stop, index });
 	});
 
+	const commonBefore = stopsBefore.filter((s) => afterMap.has(s.station_id));
+	const commonAfter = stopsAfter.filter((s) => beforeMap.has(s.station_id));
+
+	const commonBeforeRank = new Map<string, number>();
+	for (let i = 0; i < commonBefore.length; i++) {
+		commonBeforeRank.set(commonBefore[i].station_id, i);
+	}
+
+	const commonAfterRank = new Map<string, number>();
+	for (let i = 0; i < commonAfter.length; i++) {
+		commonAfterRank.set(commonAfter[i].station_id, i);
+	}
+
+	const sequenceChanged = commonBefore.some(
+		(s, i) => s.station_id !== commonAfter[i]?.station_id,
+	);
+
 	const stopsDiff: ItineraryStopDiff[] = [];
 	let retimedCount = 0;
 	let unchangedCount = 0;
@@ -32,7 +49,8 @@ export function diffItineraries(
 	// Walk after stops to identify unchanged, retimed, or added
 	const handledBeforeStations = new Set<string>();
 
-	for (const afterStop of stopsAfter) {
+	for (let afterIndex = 0; afterIndex < stopsAfter.length; afterIndex++) {
+		const afterStop = stopsAfter[afterIndex];
 		const beforeEntry = beforeMap.get(afterStop.station_id);
 
 		if (!beforeEntry) {
@@ -44,6 +62,9 @@ export function diffItineraries(
 				timeBefore: null,
 				timeAfter: afterStop.time_est,
 				deltaSecs: 0,
+				sequenceBefore: null,
+				sequenceAfter: afterIndex + 1,
+				reordered: false,
 			});
 			continue;
 		}
@@ -52,6 +73,13 @@ export function diffItineraries(
 		const beforeSecs = toServiceDaySecs(beforeEntry.stop.time_est);
 		const afterSecs = toServiceDaySecs(afterStop.time_est);
 		const deltaSecs = afterSecs - beforeSecs;
+
+		const rankBefore = commonBeforeRank.get(afterStop.station_id);
+		const rankAfter = commonAfterRank.get(afterStop.station_id);
+		const reordered =
+			rankBefore !== undefined &&
+			rankAfter !== undefined &&
+			rankBefore !== rankAfter;
 
 		if (deltaSecs === 0) {
 			unchangedCount++;
@@ -62,6 +90,9 @@ export function diffItineraries(
 				timeBefore: beforeEntry.stop.time_est,
 				timeAfter: afterStop.time_est,
 				deltaSecs: 0,
+				sequenceBefore: beforeEntry.index + 1,
+				sequenceAfter: afterIndex + 1,
+				reordered,
 			});
 		} else {
 			retimedCount++;
@@ -72,12 +103,16 @@ export function diffItineraries(
 				timeBefore: beforeEntry.stop.time_est,
 				timeAfter: afterStop.time_est,
 				deltaSecs,
+				sequenceBefore: beforeEntry.index + 1,
+				sequenceAfter: afterIndex + 1,
+				reordered,
 			});
 		}
 	}
 
 	// Walk before stops to find removed
-	for (const beforeStop of stopsBefore) {
+	for (let beforeIndex = 0; beforeIndex < stopsBefore.length; beforeIndex++) {
+		const beforeStop = stopsBefore[beforeIndex];
 		if (!handledBeforeStations.has(beforeStop.station_id)) {
 			removedCount++;
 			stopsDiff.push({
@@ -87,6 +122,9 @@ export function diffItineraries(
 				timeBefore: beforeStop.time_est,
 				timeAfter: null,
 				deltaSecs: 0,
+				sequenceBefore: beforeIndex + 1,
+				sequenceAfter: null,
+				reordered: false,
 			});
 		}
 	}
@@ -97,10 +135,16 @@ export function diffItineraries(
 			: `Trip ${trainIdBefore} -> ${trainIdAfter}`;
 
 	let summary: string;
-	if (retimedCount === 0 && addedCount === 0 && removedCount === 0) {
+	if (
+		!sequenceChanged &&
+		retimedCount === 0 &&
+		addedCount === 0 &&
+		removedCount === 0
+	) {
 		summary = `${tripLabel}: Identical (${unchangedCount} stops)`;
 	} else {
 		const parts: string[] = [];
+		if (sequenceChanged) parts.push("sequence changed");
 		if (retimedCount > 0) parts.push(`${retimedCount} retimed`);
 		if (addedCount > 0) parts.push(`${addedCount} added`);
 		if (removedCount > 0) parts.push(`${removedCount} removed`);
@@ -117,6 +161,7 @@ export function diffItineraries(
 		addedCount,
 		removedCount,
 		unchangedCount,
+		sequenceChanged,
 		summary,
 	};
 }

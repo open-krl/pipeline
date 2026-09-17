@@ -149,23 +149,30 @@ export function formatItineraryDiff(
 	if (
 		diff.stops.length > 0 &&
 		(options.detail ||
+			diff.sequenceChanged ||
 			diff.retimedCount > 0 ||
 			diff.addedCount > 0 ||
 			diff.removedCount > 0)
 	) {
 		lines.push("  Stop Details:");
 		for (const stop of diff.stops) {
-			if (stop.status === "unchanged" && !options.detail) continue;
+			if (stop.status === "unchanged" && !stop.reordered && !options.detail) {
+				continue;
+			}
+
+			const seqNotice = stop.reordered
+				? ` [order: #${stop.sequenceBefore} -> #${stop.sequenceAfter}]`
+				: "";
 
 			if (stop.status === "unchanged") {
 				lines.push(
-					`    = [${stop.stationId}] ${stop.stationName} (${stop.timeAfter})`,
+					`    ${stop.reordered ? "~" : "="} [${stop.stationId}] ${stop.stationName} (${stop.timeAfter})${seqNotice}`,
 				);
 			} else if (stop.status === "retimed") {
 				const sign = stop.deltaSecs >= 0 ? "+" : "";
 				const mins = Math.round(stop.deltaSecs / 60);
 				lines.push(
-					`    ~ [${stop.stationId}] ${stop.stationName}: ${stop.timeBefore} -> ${stop.timeAfter} (${sign}${mins}m / ${sign}${stop.deltaSecs}s)`,
+					`    ~ [${stop.stationId}] ${stop.stationName}: ${stop.timeBefore} -> ${stop.timeAfter} (${sign}${mins}m / ${sign}${stop.deltaSecs}s)${seqNotice}`,
 				);
 			} else if (stop.status === "added") {
 				lines.push(

@@ -326,6 +326,37 @@ describe("Semantic Diff Engine — Train Itinerary", () => {
 			"Trip 1022: 1 retimed, 1 added, 1 removed (1 unchanged)",
 		);
 	});
+
+	it("detects stop sequence inversions and reroutings", () => {
+		// Swapped MRI and BKS order
+		const invertedStops: ItineraryStop[] = [
+			baselineStops[0], // JAKK
+			baselineStops[2], // BKS
+			baselineStops[1], // MRI
+		];
+
+		const diff = diffItineraries("1022", baselineStops, "1022", invertedStops);
+		expect(diff.sequenceChanged).toBe(true);
+		expect(diff.summary).toContain("sequence changed");
+
+		const jakk = diff.stops.find((s) => s.stationId === "JAKK");
+		const mri = diff.stops.find((s) => s.stationId === "MRI");
+		const bks = diff.stops.find((s) => s.stationId === "BKS");
+
+		expect(jakk?.reordered).toBe(false);
+		expect(mri?.reordered).toBe(true);
+		expect(mri?.sequenceBefore).toBe(2);
+		expect(mri?.sequenceAfter).toBe(3);
+
+		expect(bks?.reordered).toBe(true);
+		expect(bks?.sequenceBefore).toBe(3);
+		expect(bks?.sequenceAfter).toBe(2);
+
+		const formatted = formatItineraryDiff(diff);
+		expect(formatted).toContain("sequence changed");
+		expect(formatted).toContain("[order: #2 -> #3]");
+		expect(formatted).toContain("[order: #3 -> #2]");
+	});
 });
 
 describe("Semantic Diff Engine — Formatters & Snapshot Diffing", () => {

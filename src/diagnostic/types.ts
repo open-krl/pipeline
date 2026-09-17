@@ -81,6 +81,9 @@ export interface ItineraryStopDiff {
 	timeBefore: string | null;
 	timeAfter: string | null;
 	deltaSecs: number;
+	sequenceBefore?: number | null;
+	sequenceAfter?: number | null;
+	reordered?: boolean;
 }
 
 export interface ItineraryDiff {
@@ -93,6 +96,7 @@ export interface ItineraryDiff {
 	addedCount: number;
 	removedCount: number;
 	unchangedCount: number;
+	sequenceChanged: boolean;
 	summary: string;
 }
 
