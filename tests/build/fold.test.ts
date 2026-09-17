@@ -539,4 +539,142 @@ describe("Pure Functional Fold Suite", () => {
 		expect(result.quarantinedTrips[0].trip_id).toBe("5022D");
 		expect(result.quarantinedTrips[0].reason).toBe("attribute_conflict");
 	});
+
+	it("applies trip-scoped station override for 5169D (KAT -> SUDB) but leaves untargeted trains to topological fallback", () => {
+		const sudbBoard: DepartureBoardResponse = {
+			status: 200,
+			data: [
+				{
+					train_id: "5169D",
+					ka_name: "COMMUTER LINE CIKARANG",
+					route_name: "ANGKE-BEKASI",
+					dest: "BEKASI",
+					time_est: "10:15:00",
+					color: "#0084D8",
+					dest_time: "11:00:00",
+				},
+				{
+					train_id: "5022D",
+					ka_name: "COMMUTER LINE CIKARANG",
+					route_name: "ANGKE-BEKASI",
+					dest: "BEKASI",
+					time_est: "10:15:00",
+					color: "#0084D8",
+					dest_time: "11:00:00",
+				},
+			],
+		};
+
+		const mriBoard2: DepartureBoardResponse = {
+			status: 200,
+			data: [
+				{
+					train_id: "5169D",
+					ka_name: "COMMUTER LINE CIKARANG",
+					route_name: "ANGKE-BEKASI",
+					dest: "BEKASI",
+					time_est: "10:25:00",
+					color: "#0084D8",
+					dest_time: "11:00:00",
+				},
+				{
+					train_id: "5022D",
+					ka_name: "COMMUTER LINE CIKARANG",
+					route_name: "ANGKE-BEKASI",
+					dest: "BEKASI",
+					time_est: "10:25:00",
+					color: "#0084D8",
+					dest_time: "11:00:00",
+				},
+			],
+		};
+
+		const boardsMap = new Map<string, DepartureBoardResponse>();
+		boardsMap.set("SUDB", sudbBoard);
+		boardsMap.set("MRI", mriBoard2);
+
+		const itinerariesMap = new Map();
+		itinerariesMap.set("5169D", {
+			train_id: "5169D",
+			observations: {
+				weekday: {
+					fetched_at: "2026-09-17T03:15:00Z",
+					payload_hash: "hash5169D",
+					stops: [
+						{ station_id: "KAT", time_est: "10:15:00", transit_station: false },
+						{ station_id: "MRI", time_est: "10:25:00", transit_station: false },
+						{ station_id: "BKS", time_est: "11:00:00", transit_station: false },
+					],
+				},
+			},
+		});
+
+		// 5022D has the same KAT stop in its itinerary, but is NOT in TRIP_STATION_OVERRIDES
+		itinerariesMap.set("5022D", {
+			train_id: "5022D",
+			observations: {
+				weekday: {
+					fetched_at: "2026-09-17T03:15:00Z",
+					payload_hash: "hash5022D",
+					stops: [
+						{ station_id: "KAT", time_est: "10:15:00", transit_station: false },
+						{ station_id: "MRI", time_est: "10:25:00", transit_station: false },
+						{ station_id: "BKS", time_est: "11:00:00", transit_station: false },
+					],
+				},
+			},
+		});
+
+		const archive: RawArchive = {
+			timetableVersion: 1,
+			snapshots: [
+				{
+					id: 1,
+					manifest: {
+						timetable_version: 1,
+						snapshot_id: 1,
+						snapshot_date: "2026-09-17",
+						day_type: "weekday",
+						region_scope: "jabodetabek",
+						station_master_hash: "hash",
+						board_response_hash: "board",
+						fetched_at: "2026-09-17T03:00:00Z",
+						status: "complete",
+					},
+					archiveCommit: "commit1",
+					stations: stationsPayload,
+					boards: boardsMap,
+				},
+			],
+			itineraries: itinerariesMap,
+			stationCoordinates: new Map(),
+			holidays: [],
+		};
+
+		const result = foldArchive(archive);
+
+		// 1. Target train 5169D: KAT is resolved to SUDB via TRIP_STATION_OVERRIDES
+		const trip5169D = result.trips.find((t) => t.trip_id === "5169D");
+		expect(trip5169D).toBeDefined();
+		expect(trip5169D?.source).toBe("itinerary");
+		expect(trip5169D?.origin_station_id).toBe("SUDB");
+		expect(trip5169D?.dest_station_id).toBe("BKS");
+
+		const stops5169D = result.tripStops.filter((s) => s.trip_id === "5169D");
+		expect(stops5169D.length).toBe(3);
+		expect(stops5169D[0].station_id).toBe("SUDB");
+		expect(stops5169D[1].station_id).toBe("MRI");
+		expect(stops5169D[2].station_id).toBe("BKS");
+
+		// 2. Non-target train 5022D: KAT remains unmapped, fails Invariant 9, and falls back to reconstruction
+		const trip5022D = result.trips.find((t) => t.trip_id === "5022D");
+		expect(trip5022D).toBeDefined();
+		expect(trip5022D?.source).toBe("reconstructed");
+
+		const stops5022D = result.tripStops.filter((s) => s.trip_id === "5022D");
+		expect(stops5022D.length).toBe(3);
+		expect(stops5022D[0].station_id).toBe("SUDB");
+		expect(stops5022D[1].station_id).toBe("MRI");
+		expect(stops5022D[2].station_id).toBe("BKS");
+	});
 });
