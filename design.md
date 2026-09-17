@@ -557,7 +557,7 @@ Execution runs via a local TypeScript/Bun CLI toolchain requiring zero long-runn
   - **Departure Board Delta:** Fingerprint-based trip matching ($\text{base\_train\_no}$, origin, dest, arrival $\pm$ tolerance) classifying trips as re-lettered (`5022D → 5022E`), retimed departures ($\pm\Delta$ minutes), or added/withdrawn services.
   - **Itinerary Delta:** Stop sequence changes, added/removed stops, dwell & transit variations ($\pm\Delta$ seconds).
   - **Day-Type Awareness:** Automatically annotates comparisons. Same-day comparisons are flagged as *potential edition drift*; cross-day comparisons are classified as *calendar variance*, suppressing false alarms.
-  - **Flags:** `--summary` (high-level metrics) and `--detail` (station-by-station and stop-by-stop drill-down).
+  - **Flags:** Default summary view and `--detail` (station-by-station and stop-by-stop drill-down).
 - **`calendar`**: (Out-of-DAG read-only tool) Pretty-prints the three-way set-difference across day types for human review, powered by the shared fingerprint trip-matching engine, outputting empirical schedule identity statistics (verifying static vs. date-aware behavior).
 - **`detect`**: (Out-of-DAG operational monitor) Probes a 3-station signature representing key corridor families—Manggarai (Central/Bogor), Bekasi (Cikarang), and Rangkasbitung (Western branch)—and compares the live departures against the active database edition filtered for **today's specific day type** (`trip_calendar[day_type] == 1`), reusing the core departure comparison logic. Eliminates false positives from weekend calendar variance and avoids spatial blind spots on branch lines in ~15 seconds.
 

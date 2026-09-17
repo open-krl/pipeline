@@ -12,8 +12,8 @@ flowchart LR
     M2 --> M3["M3: Itinerary Census<br/><b>COMPLETED</b>"]
     M3 --> M4["M4: Database Build<br/><b>COMPLETED</b>"]
     M4 --> M5["M5: GTFS Export<br/><b>COMPLETED</b>"]
-    M5 --> M6["M6: Diagnostics<br/><b>NEXT UP</b>"]
-    M6 --> M7["M7: Production Ops<br/><b>PLANNED</b>"]
+    M5 --> M6["M6: Diagnostics<br/><b>COMPLETED</b>"]
+    M6 --> M7["M7: Production Ops<br/><b>NEXT UP</b>"]
 ```
 
 | Milestone | Stage / Area | Key Artifacts & Contracts | Status |
@@ -126,7 +126,7 @@ flowchart LR
   - Day-type awareness classifying cross-day comparisons as expected calendar variance vs same-day comparisons as edition drift.
 - [x] **Task 6.2: `krl diff` CLI Tool (`src/diagnostic/cli-diff.ts`)**
   - Standalone command to diff two snapshots (`krl diff 1:1 1:3` or `krl diff --v1 1 --v2 2`) or two itinerary envelopes (`krl diff --train 5022D 5022E`).
-  - Ephemeral terminal rendering with summary metrics and station/trip drill-down flags (`--summary`, `--detail`).
+  - Ephemeral terminal rendering with summary metrics and station/trip drill-down flags (`--detail`).
 - [x] **Task 6.3: Capture Gate & Census Spot-Check Semantic Integration**
   - Wire semantic diff summaries into Gate 1 (catalog) and Gate 2 (boards) in `krl capture` before the version-bump prompt.
   - Enforce degraded-baseline exclusion in Gate 1 & Gate 2 (compare only against `status: "complete"`).
