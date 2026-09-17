@@ -117,22 +117,46 @@ describe("src/cli — CAC architecture", () => {
 		expect(parsed2.options.timetableVersion).toBe(5);
 	});
 
+	it("parses build positional version and path options", () => {
+		const cli = createCli();
+		const parsed = cli.parse(
+			[
+				"bun",
+				"src/cli.ts",
+				"build",
+				"1",
+				"--data-dir",
+				"data/custom-raw",
+				"--out-dir",
+				"data/custom-build",
+				"--db-path",
+				"custom.db",
+			],
+			{ run: false },
+		);
+
+		expect(cli.matchedCommand?.name).toBe("build");
+		expect(parsed.args[0]).toBe("1");
+		expect(parsed.options.dataDir).toBe("data/custom-raw");
+		expect(parsed.options.outDir).toBe("data/custom-build");
+		expect(parsed.options.dbPath).toBe("custom.db");
+	});
+
 	it("executes milestone stub commands cleanly", async () => {
 		const logs: string[] = [];
 		const origLog = console.log;
 		console.log = (msg: string) => logs.push(msg);
 
 		try {
-			for (const cmd of ["build", "export", "calendar", "detect"]) {
+			for (const cmd of ["export", "calendar", "detect"]) {
 				const cli = createCli();
 				cli.parse(["bun", "src/cli.ts", cmd], { run: false });
 				await cli.runMatchedCommand();
 			}
-			expect(logs.length).toBe(4);
-			expect(logs[0]).toContain("build");
-			expect(logs[1]).toContain("export");
-			expect(logs[2]).toContain("calendar");
-			expect(logs[3]).toContain("detect");
+			expect(logs.length).toBe(3);
+			expect(logs[0]).toContain("export");
+			expect(logs[1]).toContain("calendar");
+			expect(logs[2]).toContain("detect");
 		} finally {
 			console.log = origLog;
 		}
