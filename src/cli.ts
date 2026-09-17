@@ -782,8 +782,14 @@ Export Time:        ${result.durationSecs}s
 						);
 						process.exit(1);
 					}
+					const [y, m, d] = options.date.split("-").map(Number);
 					parsedDate = new Date(`${options.date}T00:00:00+07:00`);
-					if (Number.isNaN(parsedDate.getTime())) {
+					if (
+						Number.isNaN(parsedDate.getTime()) ||
+						parsedDate.getFullYear() !== y ||
+						parsedDate.getMonth() + 1 !== m ||
+						parsedDate.getDate() !== d
+					) {
 						console.error(`Error: Invalid calendar date '${options.date}'.`);
 						process.exit(1);
 					}

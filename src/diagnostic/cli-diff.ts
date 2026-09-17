@@ -1,5 +1,7 @@
 // src/diagnostic/cli-diff.ts
+
 import { itinerariesDir } from "../archive/layout";
+import { DayTypeSchema } from "../archive/schemas";
 import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
 import { getItineraryPath, readItineraryEnvelope } from "../census/envelope";
 import { resolveSafePath } from "../core/path";
@@ -29,10 +31,21 @@ export function parseSnapshotRef(
 ): SnapshotRef {
 	const trimmed = token.trim();
 	if (trimmed.includes(":")) {
-		const [vStr, sStr] = trimmed.split(":");
+		const parts = trimmed.split(":");
+		if (parts.length !== 2) {
+			throw new Error(
+				`Invalid snapshot reference '${token}'. Expected format '<version>:<snapshot_id>' (e.g. 1:3).`,
+			);
+		}
+		const [vStr, sStr] = parts;
+		if (!/^\d+$/.test(vStr) || !/^\d+$/.test(sStr)) {
+			throw new Error(
+				`Invalid snapshot reference '${token}'. Expected format '<version>:<snapshot_id>' (e.g. 1:3).`,
+			);
+		}
 		const v = Number.parseInt(vStr, 10);
 		const s = Number.parseInt(sStr, 10);
-		if (Number.isNaN(v) || Number.isNaN(s) || v <= 0 || s <= 0) {
+		if (v <= 0 || s <= 0) {
 			throw new Error(
 				`Invalid snapshot reference '${token}'. Expected format '<version>:<snapshot_id>' (e.g. 1:3).`,
 			);
@@ -40,8 +53,13 @@ export function parseSnapshotRef(
 		return { version: v, snapshotId: s };
 	}
 
+	if (!/^\d+$/.test(trimmed)) {
+		throw new Error(
+			`Invalid snapshot ID '${token}'. Expected a positive integer or '<version>:<snapshot_id>'.`,
+		);
+	}
 	const s = Number.parseInt(trimmed, 10);
-	if (Number.isNaN(s) || s <= 0) {
+	if (s <= 0) {
 		throw new Error(
 			`Invalid snapshot ID '${token}'. Expected a positive integer or '<version>:<snapshot_id>'.`,
 		);
@@ -85,6 +103,14 @@ export async function executeDiff(
 		const targetVersion = options.v1
 			? Number.parseInt(String(options.v1), 10)
 			: activeVersion;
+		if (options.dayType !== undefined) {
+			const parsedDayType = DayTypeSchema.safeParse(options.dayType);
+			if (!parsedDayType.success) {
+				throw new Error(
+					`Invalid day type '${options.dayType}'. Must be weekday, saturday, sunday, or holiday.`,
+				);
+			}
+		}
 		const targetDayType = options.dayType ?? "weekday";
 		const iDir = itinerariesDir(dataDir, targetVersion);
 
@@ -107,14 +133,23 @@ export async function executeDiff(
 					`Itinerary envelope not found for train ${trainB} at ${pathB}`,
 				);
 
-			const stopsA =
-				envA.observations[targetDayType as keyof typeof envA.observations]
-					?.stops ?? [];
-			const stopsB =
-				envB.observations[targetDayType as keyof typeof envB.observations]
-					?.stops ?? [];
+			const obsA =
+				envA.observations[targetDayType as keyof typeof envA.observations];
+			const obsB =
+				envB.observations[targetDayType as keyof typeof envB.observations];
 
-			const diff = diffItineraries(trainA, stopsA, trainB, stopsB);
+			if (!obsA || obsA.stops.length === 0) {
+				throw new Error(
+					`Train ${trainA} has no observations for day type '${targetDayType}'`,
+				);
+			}
+			if (!obsB || obsB.stops.length === 0) {
+				throw new Error(
+					`Train ${trainB} has no observations for day type '${targetDayType}'`,
+				);
+			}
+
+			const diff = diffItineraries(trainA, obsA.stops, trainB, obsB.stops);
 			console.log(
 				`\n=============================================================`,
 			);
@@ -181,6 +216,10 @@ export async function executeDiff(
 	if (args.length >= 2) {
 		beforeRef = parseSnapshotRef(args[0], activeVersion);
 		afterRef = parseSnapshotRef(args[1], activeVersion);
+	} else if (args.length === 1) {
+		throw new Error(
+			`Expected two snapshot references (e.g. krl diff 1:1 1:3), but only received '${args[0]}'.`,
+		);
 	} else if (options.v1 && options.v2) {
 		const v1Num = Number.parseInt(String(options.v1), 10);
 		const v2Num = Number.parseInt(String(options.v2), 10);
@@ -254,7 +293,9 @@ export async function executeDiff(
 
 	let evaluation: string;
 	if (result.boardDiff.dayTypeContext === "calendar_variance") {
-		evaluation = "CALENDAR VARIANCE (expected day-type difference)";
+		evaluation = hasCatalogChanges
+			? "CALENDAR VARIANCE WITH CATALOG MUTATIONS (Potential Edition Drift)"
+			: "CALENDAR VARIANCE (expected day-type difference)";
 	} else if (!hasTimetableChanges) {
 		evaluation = "STABLE (Identical Timetable)";
 	} else {

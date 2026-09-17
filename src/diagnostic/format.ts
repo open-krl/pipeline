@@ -220,7 +220,7 @@ export function formatCalendarReport(
 	);
 	lines.push(`Calendar Resolution:  ${resolutionStatus}`);
 	lines.push(
-		`Total Unique Services:${result.totalServices.toLocaleString()} distinct operational runs`,
+		`Total Unique Services: ${result.totalServices.toLocaleString()} distinct operational runs`,
 	);
 	lines.push(
 		`Weekday Departures:   ${availableDayTypes.weekday ? `${totalTripsByDayType.weekday.toLocaleString()} trips` : "N/A"}`,
@@ -398,7 +398,7 @@ export function formatDetectReport(result: DetectResult): string {
 				: "POTENTIAL TIMETABLE EDITION DRIFT ⚠️";
 	lines.push(`Status:               ${statusEmoji}`);
 	lines.push(
-		`Congruent Departures: ${result.totalIdentical} / ${result.totalExpected} (${result.totalExpected > 0 ? ((result.totalIdentical / result.totalExpected) * 100).toFixed(1) : 0}%)`,
+		`Congruent Departures: ${result.totalIdentical} / ${result.totalExpected} (${result.totalExpected > 0 ? `${((result.totalIdentical / result.totalExpected) * 100).toFixed(1)}%` : "N/A"})`,
 	);
 	lines.push(`Re-lettered Services: ${result.totalRelettered}`);
 	lines.push(`Retimed Services:     ${result.totalRetimed}`);

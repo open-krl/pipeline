@@ -26,6 +26,9 @@ describe("CLI Diff Tool — parseSnapshotRef", () => {
 		expect(() => parseSnapshotRef("1:-1", 1)).toThrow(
 			"Invalid snapshot reference",
 		);
+		expect(() => parseSnapshotRef("1:3:5", 1)).toThrow(
+			"Invalid snapshot reference",
+		);
 	});
 });
 
@@ -73,5 +76,21 @@ describe("CLI Diff Tool — executeDiff integration", () => {
 		expect(output).toContain("Train Itinerary Diff: v1 1000 vs 1000 (weekday)");
 		expect(output).toContain("Itinerary: Trip 1000: Identical (17 stops)");
 		expect(output).toContain("[BOO] BOGOR");
+	});
+
+	it("throws when only one snapshot reference is provided", async () => {
+		await expect(executeDiff(["1:1"], { dataDir: "data/raw" })).rejects.toThrow(
+			"Expected two snapshot references",
+		);
+	});
+
+	it("throws when invalid day type is provided for itinerary diff", async () => {
+		await expect(
+			executeDiff([], {
+				dataDir: "data/raw",
+				train: ["1000", "1000"],
+				dayType: "invalid_day",
+			}),
+		).rejects.toThrow("Invalid day type 'invalid_day'");
 	});
 });
