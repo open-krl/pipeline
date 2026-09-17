@@ -4,6 +4,7 @@ import {
 	computeBoardResponseHash,
 	computeStationMasterHash,
 } from "../../src/archive/hashes";
+import { resolveStationCode } from "../../src/config";
 import {
 	foldDayTypeRule,
 	formatDateWib,
@@ -280,5 +281,13 @@ describe("src/core/manifest", () => {
 		expect(computeBoardResponseHash(boardsA)).toBe(
 			computeBoardResponseHash(boardsB),
 		);
+	});
+});
+
+describe("src/config", () => {
+	it("resolves station code overrides for known upstream defects and operational diversions", () => {
+		expect(resolveStationCode("GGL")).toBe("GRG");
+		expect(resolveStationCode("KAT")).toBe("SUDB");
+		expect(resolveStationCode("MRI")).toBe("MRI");
 	});
 });
