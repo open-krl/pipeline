@@ -98,21 +98,37 @@ export function diffDepartureBoards(
 	}
 
 	let coverageNotice = "";
-	if (stationsOnlyInBefore.length > 0 || stationsOnlyInAfter.length > 0) {
-		coverageNotice = ` [Station Coverage: -${stationsOnlyInBefore.length}/+${stationsOnlyInAfter.length} stations]`;
+	if (stationsOnlyInBefore.length > 0 && stationsOnlyInAfter.length > 0) {
+		coverageNotice = ` [Coverage: -${stationsOnlyInBefore.length}/+${stationsOnlyInAfter.length} stations]`;
+	} else if (stationsOnlyInBefore.length > 0) {
+		const list = stationsOnlyInBefore.slice(0, 3).join(", ");
+		const suffix = stationsOnlyInBefore.length > 3 ? "..." : "";
+		coverageNotice = ` [Coverage: -${stationsOnlyInBefore.length} station${stationsOnlyInBefore.length > 1 ? "s" : ""} (missing: ${list}${suffix})]`;
+	} else if (stationsOnlyInAfter.length > 0) {
+		const list = stationsOnlyInAfter.slice(0, 3).join(", ");
+		const suffix = stationsOnlyInAfter.length > 3 ? "..." : "";
+		coverageNotice = ` [Coverage: +${stationsOnlyInAfter.length} station${stationsOnlyInAfter.length > 1 ? "s" : ""} (${list}${suffix})]`;
 	}
+
+	const hasChanges =
+		matchResult.relettered.length > 0 ||
+		matchResult.retimed.length > 0 ||
+		matchResult.added.length > 0 ||
+		matchResult.withdrawn.length > 0;
 
 	const contextLabel = isCrossDayType
 		? `[Calendar Variance: ${dtBefore} -> ${dtAfter}]`
-		: `[Edition Drift]`;
+		: hasChanges
+			? `[Edition Drift]`
+			: `[Identical]`;
 
 	let summary: string;
 	if (parts.length === 0 && !coverageNotice) {
 		summary = `${contextLabel} Boards identical (${matchResult.identical.length} trips, ${stationsInBoth} stations)`;
+	} else if (parts.length === 0) {
+		summary = `${contextLabel}${coverageNotice} All trips identical (${matchResult.identical.length} trips)`;
 	} else {
-		const changeDetails =
-			parts.length > 0 ? parts.join(", ") : "Identical trips";
-		summary = `${contextLabel}${coverageNotice} ${changeDetails} (${matchResult.identical.length} identical trips)`;
+		summary = `${contextLabel}${coverageNotice} ${parts.join(", ")} (${matchResult.identical.length} identical trips)`;
 	}
 
 	return {

@@ -245,7 +245,7 @@ describe("Semantic Diff Engine — Trip Fingerprinting & Departure Boards", () =
 		});
 
 		expect(diff.stationCoverage.stationsOnlyInBefore).toEqual(["PSM"]);
-		expect(diff.summary).toContain("[Station Coverage: -1/+0 stations]");
+		expect(diff.summary).toContain("[Coverage: -1 station (missing: PSM)]");
 	});
 });
 

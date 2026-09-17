@@ -48,7 +48,7 @@ describe("CLI Diff Tool — executeDiff integration", () => {
 		expect(output).toContain(
 			"KRL Snapshot Diff: v1:1 (weekday) -> v1:3 (weekday)",
 		);
-		expect(output).toContain("POTENTIAL EDITION DRIFT");
+		expect(output).toContain("Evaluation: STABLE (Identical Timetable)");
 		expect(output).toContain("identical (114 stations)");
 		expect(output).toContain("New in target capture: GRG");
 	});

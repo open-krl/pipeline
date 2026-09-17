@@ -240,9 +240,28 @@ export async function executeDiff(
 	console.log(
 		`KRL Snapshot Diff: v${result.snapshotBefore.version}:${result.snapshotBefore.snapshotId} (${result.manifestBefore.day_type}) -> v${result.snapshotAfter.version}:${result.snapshotAfter.snapshotId} (${result.manifestAfter.day_type})`,
 	);
-	console.log(
-		`Evaluation: ${result.boardDiff.dayTypeContext === "calendar_variance" ? "CALENDAR VARIANCE (expected day-type difference)" : "POTENTIAL EDITION DRIFT"}`,
-	);
+	const hasBoardChanges =
+		result.boardDiff.relettered.length > 0 ||
+		result.boardDiff.retimed.length > 0 ||
+		result.boardDiff.added.length > 0 ||
+		result.boardDiff.withdrawn.length > 0;
+	const hasCatalogChanges =
+		result.catalogDiff != null &&
+		(result.catalogDiff.added.length > 0 ||
+			result.catalogDiff.removed.length > 0 ||
+			result.catalogDiff.updated.length > 0);
+	const hasTimetableChanges = hasBoardChanges || hasCatalogChanges;
+
+	let evaluation: string;
+	if (result.boardDiff.dayTypeContext === "calendar_variance") {
+		evaluation = "CALENDAR VARIANCE (expected day-type difference)";
+	} else if (!hasTimetableChanges) {
+		evaluation = "STABLE (Identical Timetable)";
+	} else {
+		evaluation = "POTENTIAL EDITION DRIFT (Timetable revisions detected)";
+	}
+
+	console.log(`Evaluation: ${evaluation}`);
 	console.log(`=============================================================`);
 
 	if (result.catalogDiff) {
