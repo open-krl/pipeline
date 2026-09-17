@@ -9,8 +9,11 @@ import { promisify } from "node:util";
 import type { CaptureManifest } from "../../src/api/schemas";
 import {
 	commitCaptureSnapshot,
-	formatCensusCommitMessage,
 	formatSnapshotCommitMessage,
+} from "../../src/capture/capture";
+import { formatCensusCommitMessage } from "../../src/census/census";
+import {
+	commitPath,
 	getGitCommitHash,
 	isGitRepository,
 } from "../../src/core/git";
@@ -245,6 +248,30 @@ describe("src/core/git", () => {
 				{ cwd: tempDir },
 			);
 			expect(status.trim()).toBe("?? src/unrelated.ts");
+		});
+
+		it("commitPath directly commits a target directory and respects contamination guard", async () => {
+			const targetDir = path.join(tempDir, "data/custom");
+			await fs.mkdir(targetDir, { recursive: true });
+			await fs.writeFile(path.join(targetDir, "data.txt"), "hello world");
+
+			const result = await commitPath({
+				path: targetDir,
+				message: "chore: test generic commitPath",
+				cwd: tempDir,
+			});
+
+			expect(result.committed).toBe(true);
+			expect(result.commitHash).toBeDefined();
+
+			// Clean second run
+			const secondResult = await commitPath({
+				path: targetDir,
+				message: "chore: second commit",
+				cwd: tempDir,
+			});
+			expect(secondResult.committed).toBe(false);
+			expect(secondResult.reason).toContain("No uncommitted changes");
 		});
 	});
 });

@@ -9,7 +9,7 @@ import type {
 } from "../api/schemas";
 import { scanSnapshots, scanTimetableVersions } from "../capture";
 import { payloadHash } from "../core/canonical";
-import { type CommitCensusResult, commitCensus } from "../core/git";
+import { type CommitResult, commitPath } from "../core/git";
 import {
 	generateDefaultLogPath,
 	StructuredLogger,
@@ -407,4 +407,74 @@ export async function executeCensus(
 		commitResult,
 		logFilePath,
 	};
+}
+
+export type CommitCensusResult = CommitResult;
+
+export interface CommitCensusOptions {
+	dataDir: string;
+	version: number;
+	totalTrips: number;
+	newlyProbed: number;
+	failedCount: number;
+	cwd?: string;
+}
+
+/**
+ * Formats standard Conventional Commit message for an itinerary census run.
+ */
+export function formatCensusCommitMessage(
+	params: {
+		timetableVersion: number;
+		totalTrips: number;
+		newlyProbed: number;
+		failedCount: number;
+	},
+	options: { coAuthor?: boolean } = {},
+): string {
+	const coAuthor = options.coAuthor ?? true;
+	const footer = coAuthor
+		? "\n\nGenerated with Antigravity\nCo-authored-by: gemini-code-assist[bot] <176961590+gemini-code-assist[bot]@users.noreply.github.com>"
+		: "";
+
+	return `chore(census): record v${params.timetableVersion} itineraries census (${params.totalTrips} trips)
+
+Total Trips:  ${params.totalTrips}
+Newly Probed: ${params.newlyProbed}
+Failed:       ${params.failedCount}${footer}`;
+}
+
+/**
+ * Stages and commits itinerary census raw payloads for a timetable edition to git.
+ */
+export async function commitCensus(
+	options: CommitCensusOptions,
+): Promise<CommitCensusResult> {
+	const cwd = options.cwd ?? process.cwd();
+	let resolvedItinerariesDir: string;
+	try {
+		const safeDataDir = resolveSafePath(options.dataDir, cwd);
+		resolvedItinerariesDir = resolveSafePath(
+			path.join(safeDataDir, String(options.version), "itineraries"),
+			cwd,
+		);
+	} catch (err) {
+		return {
+			committed: false,
+			reason: `Invalid itineraries directory: ${err instanceof Error ? err.message : String(err)}`,
+		};
+	}
+
+	const commitMessage = formatCensusCommitMessage({
+		timetableVersion: options.version,
+		totalTrips: options.totalTrips,
+		newlyProbed: options.newlyProbed,
+		failedCount: options.failedCount,
+	});
+
+	return commitPath({
+		path: resolvedItinerariesDir,
+		message: commitMessage,
+		cwd,
+	});
 }

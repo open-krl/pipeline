@@ -5,6 +5,7 @@ import * as readline from "node:readline/promises";
 import { cac } from "cac";
 import { type DayType, DayTypeSchema } from "./api/schemas";
 import {
+	commitCaptureSnapshot,
 	executeCapture,
 	formatSnapshotTable,
 	getSnapshotList,
@@ -13,7 +14,6 @@ import {
 } from "./capture";
 import { executeCensus } from "./census";
 import { type RegionScope, RegionScopeSchema } from "./config";
-import { commitCaptureSnapshot } from "./core/git";
 import { resolveSafePath } from "./core/path";
 
 export function createCli() {
