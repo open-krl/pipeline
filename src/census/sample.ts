@@ -1,10 +1,13 @@
 // src/census/sample.ts
 import type { KciClient } from "../api/client";
+import {
+	getItineraryPath,
+	readItineraryEnvelope,
+} from "./../archive/itineraries";
 import type { DayType } from "../archive/schemas";
 import { payloadHash } from "../core/canonical";
 import { diffItineraries } from "../diagnostic/itinerary";
 import type { DiscoveredTrain } from "./discovery";
-import { getItineraryPath, readItineraryEnvelope } from "./envelope";
 
 export interface StratifiedDivergence {
 	stratum: string;

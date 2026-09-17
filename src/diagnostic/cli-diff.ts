@@ -1,9 +1,12 @@
 // src/diagnostic/cli-diff.ts
 
+import {
+	getItineraryPath,
+	readItineraryEnvelope,
+} from "../archive/itineraries";
 import { itinerariesDir } from "../archive/layout";
 import { DayTypeSchema } from "../archive/schemas";
 import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
-import { getItineraryPath, readItineraryEnvelope } from "../census/envelope";
 import { resolveSafePath } from "../core/path";
 import {
 	formatBoardDiff,

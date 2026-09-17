@@ -224,3 +224,31 @@ export function generateDefaultLogPath(
 	const logsDir = context.baseDir ? path.join(context.baseDir, "logs") : "logs";
 	return path.join(logsDir, `${parts.join("-")}.jsonl`);
 }
+
+/**
+ * Shared pipeline bootstrap: resolves an injected logger or creates one
+ * (file-backed by default, silent with noLog). Returns the effective
+ * logger and its resolved log file path.
+ */
+export function resolvePipelineLogging(params: {
+	logger?: StructuredLogger;
+	logFilePath?: string;
+	noLog?: boolean;
+	defaultLogName: string;
+	context: Record<string, unknown>;
+	baseDir?: string;
+}): { logger: StructuredLogger; logFilePath?: string } {
+	if (params.logger) {
+		return { logger: params.logger, logFilePath: params.logger.logFilePath };
+	}
+	if (params.noLog) {
+		return { logger: new StructuredLogger() };
+	}
+	const logFilePath =
+		params.logFilePath ??
+		generateDefaultLogPath(params.defaultLogName, {
+			...params.context,
+			baseDir: params.baseDir,
+		});
+	return { logger: new StructuredLogger({ logFilePath }), logFilePath };
+}

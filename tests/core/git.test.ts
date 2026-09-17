@@ -11,7 +11,7 @@ import {
 	commitCaptureSnapshot,
 	formatSnapshotCommitMessage,
 } from "../../src/capture/commit";
-import { formatCensusCommitMessage } from "../../src/census/census";
+import { formatCensusCommitMessage } from "../../src/census/commit";
 import {
 	commitPath,
 	getGitCommitForPath,
