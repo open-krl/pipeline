@@ -11,6 +11,7 @@ import { formatSnapshotTable, getSnapshotList } from "./capture/snapshots";
 import { executeCensus } from "./census/census";
 import { type RegionScope, RegionScopeSchema } from "./config";
 import { resolveSafePath } from "./core/path";
+import { executeExport } from "./export/export";
 
 export function createCli() {
 	const cli = cac("krl");
@@ -463,12 +464,110 @@ Compilation Time:   ${result.durationSecs}s
 			},
 		);
 
-	// 6. Future milestones
+	// 6. export
+	cli
+		.command(
+			"export [version]",
+			"Generate standard GTFS specification feed package (§9, §11)",
+		)
+		.option("--db-path <path>", "Override SQLite database path")
+		.option("--out-dir <path>", "Override output directory", {
+			default: "data/build",
+		})
+		.option(
+			"--start-date <date>",
+			"Feed validity start date (YYYY-MM-DD or YYYYMMDD)",
+		)
+		.option(
+			"--end-date <date>",
+			"Feed validity end date (YYYY-MM-DD or YYYYMMDD)",
+		)
+		.option(
+			"--require-resolved-calendar",
+			"Fail if calendar state is provisional (all 3 day types required)",
+		)
+		.option(
+			"--require-census-complete",
+			"Fail if any trips remain with itinerary_status = 'unprobed'",
+		)
+		.option(
+			"--require-holiday-coverage",
+			"Fail if feed end date exceeds covered statutory holiday decrees",
+		)
+		.option("--dump-csv <dir>", "Dump uncompressed GTFS CSV files to directory")
+		.action(
+			async (
+				versionArg: string | undefined,
+				options: {
+					dbPath?: string;
+					outDir?: string;
+					startDate?: string;
+					endDate?: string;
+					requireResolvedCalendar?: boolean;
+					requireCensusComplete?: boolean;
+					requireHolidayCoverage?: boolean;
+					dumpCsv?: string;
+				},
+			) => {
+				let version: number | undefined;
+				if (versionArg !== undefined) {
+					const trimmed = versionArg.trim();
+					const parsed = Number.parseInt(trimmed, 10);
+					if (
+						!/^\d+$/.test(trimmed) ||
+						!Number.isSafeInteger(parsed) ||
+						parsed <= 0
+					) {
+						console.error(
+							`Error: Invalid version '${versionArg}'. Must be a positive integer.`,
+						);
+						process.exit(1);
+					}
+					version = parsed;
+				}
+
+				console.log("Starting KRL GTFS feed export...");
+				try {
+					const result = await executeExport({
+						version,
+						dbPath: options.dbPath,
+						outDir: options.outDir,
+						startDate: options.startDate,
+						endDate: options.endDate,
+						requireResolvedCalendar: options.requireResolvedCalendar,
+						requireCensusComplete: options.requireCensusComplete,
+						requireHolidayCoverage: options.requireHolidayCoverage,
+						dumpCsvDir: options.dumpCsv,
+					});
+
+					console.log(`
+── Export Summary ───────────────────────────────────────────
+Timetable Version:  ${result.timetableVersion}
+Archive Target:     ${result.zipPath} (${(result.zipSizeBytes / 1024).toFixed(1)} KB)
+SHA-256 Digest:     ${result.sha256}
+Validity Horizon:   ${result.startDate} to ${result.endDate}
+Routes Compiled:    ${result.stats.routesCount}
+Trips Exported:     ${result.stats.tripsCount.toLocaleString()}
+Stops Exported:     ${result.stats.stopsCount}
+Stop Times Rows:    ${result.stats.stopTimesCount.toLocaleString()}
+Calendar Profiles:  ${result.stats.calendarCount} (${result.stats.calendarDatesCount} holiday exceptions)
+Export Time:        ${result.durationSecs}s
+─────────────────────────────────────────────────────────────
+`);
+					for (const warning of result.warnings) {
+						console.warn(`[Warning] ${warning}`);
+					}
+				} catch (err) {
+					console.error(
+						`Export failed: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+			},
+		);
+
+	// 7. Future milestones
 	const upcomingCommands = [
-		{
-			name: "export",
-			desc: "Generate standard GTFS feeds (§11)",
-		},
 		{
 			name: "calendar",
 			desc: "Inspect three-way day-type set differences & schedule identity report (§9)",

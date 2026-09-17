@@ -11,8 +11,8 @@ flowchart LR
     M1["M1: Core & Models<br/><b>COMPLETED</b>"] --> M2["M2: Live Capture<br/><b>COMPLETED</b>"]
     M2 --> M3["M3: Itinerary Census<br/><b>COMPLETED</b>"]
     M3 --> M4["M4: Database Build<br/><b>COMPLETED</b>"]
-    M4 --> M5["M5: GTFS Export<br/><b>NEXT UP</b>"]
-    M5 --> M6["M6: Diagnostics<br/><b>PLANNED</b>"]
+    M4 --> M5["M5: GTFS Export<br/><b>COMPLETED</b>"]
+    M5 --> M6["M6: Diagnostics<br/><b>NEXT UP</b>"]
     M6 --> M7["M7: Production Ops<br/><b>PLANNED</b>"]
 ```
 
@@ -22,8 +22,8 @@ flowchart LR
 | **Milestone 2** | Stage 1 Capture (`krl capture`) | Raw snapshot boards, Gates 1 & 2 drift checks, manifest, git commits | ✅ **Completed** |
 | **Milestone 3** | Stage 2 Census (`krl census`) | Stratified spot-checks, resumable crawler, multi-observation envelopes | ✅ **Completed** |
 | **Milestone 4** | Stage 3 Build (`krl build`) | Pure functional fold, 13 invariants, topological fallback, SQLite WAL DB | ✅ **Completed** |
-| **Milestone 5** | Stage 4 Export (`krl export`) | GTFS spec CSVs, release gates, validation report, zip packaging | 🟡 **Next Up** |
-| **Milestone 6** | Diagnostic Tooling | Out-of-DAG tools: `krl calendar` (diff report) and `krl detect` (live probe) | ⚪ Planned |
+| **Milestone 5** | Stage 4 Export (`krl export`) | GTFS spec CSVs, release gates, validation report, zip packaging | ✅ **Completed** |
+| **Milestone 6** | Diagnostic Tooling | Out-of-DAG tools: `krl calendar` (diff report) and `krl detect` (live probe) | 🟡 **Next Up** |
 | **Milestone 7** | Automation & Hardening | CI/CD test automation, scheduled cron captures, release distribution | ⚪ Planned |
 
 ---
@@ -92,10 +92,10 @@ flowchart LR
 
 ---
 
-### Milestone 5: Stage 4 GTFS Export Pipeline (`krl export`) 🟡 (Next Up)
-- [ ] **Task 5.1: Export Architecture & Data Contracts**
+### Milestone 5: Stage 4 GTFS Export Pipeline (`krl export`) ✅
+- [x] **Task 5.1: Export Architecture & Data Contracts**
   - Define export options, GTFS configuration types, and progress reporter interfaces in `src/export/types.ts`.
-- [ ] **Task 5.2: GTFS Specification Mappers (`src/export/tables/`)**
+- [x] **Task 5.2: GTFS Specification Mappers (`src/export/tables/`)**
   - `agency.txt`: Kereta Commuter Indonesia (KCI) feed metadata (`agency_id`, `agency_name`, `agency_url`, `agency_timezone`, `agency_lang`).
   - `stops.txt`: Station codes (`sta_id`), localized station names, and coordinates mapped from `data/station_coordinates.csv`.
   - `routes.txt`: Commercial transit lines derived from `ka_name` (e.g. Commuter Line Bogor, Cikarang) with route colors.
@@ -103,22 +103,22 @@ flowchart LR
   - `stop_times.txt`: Continuous service-day second formatting (`HH:MM:SS` and `24:XX:XX` for post-midnight runs), stop sequences, pickup/drop-off types.
   - `calendar.txt`: Recurring weekly service intervals derived directly from `trip_calendar` presence masks (conservative masks under provisional state).
   - `calendar_dates.txt`: Date-specific overrides; statutory national holiday service removals (`exception_type = 2`) for fakultatif trains.
-- [ ] **Task 5.3: Production Release Gates**
+- [x] **Task 5.3: Production Release Gates**
   - `--require-resolved-calendar`: Enforce all 3 day types (`weekday`, `saturday`, `sunday`) are present and `calendar_state = 'resolved'`.
   - `--require-census-complete`: Assert zero discovered trips remain with unprobed itineraries.
   - `--require-holiday-coverage`: Verify feed validity horizon does not extend past covered holiday decrees in `data/holidays.json`.
-- [ ] **Task 5.4: Packaging & Checksums**
+- [x] **Task 5.4: Packaging & Checksums**
   - Stream CSV generation into standard ZIP archive (`krl_gtfs_v<version>.zip`).
   - Generate SHA-256 feed digest for release validation.
-- [ ] **Task 5.5: CLI Integration & Summary Report**
+- [x] **Task 5.5: CLI Integration & Summary Report**
   - Implement `krl export [version]` command in `src/cli.ts` with output directory options, summary metrics, and audit reporting.
-- [ ] **Task 5.6: Test Suite**
+- [x] **Task 5.6: Test Suite**
   - Unit tests for GTFS field formatters, time stringifiers (`24:XX:XX`), and calendar mask transformers.
   - End-to-end integration tests validating generated ZIP against the official GTFS specification rules.
 
 ---
 
-### Milestone 6: Operational & Diagnostic Tooling ⚪ (Planned)
+### Milestone 6: Operational & Diagnostic Tooling 🟡 (Next Up)
 - [ ] **Task 6.1: `krl calendar` (Out-of-DAG Empirical Inspection Tool)**
   - Three-way set-difference report across `weekday`, `saturday`, and `sunday`.
   - Identity breakdown identifying shared base schedules vs. weekend/fakultatif augmentations.
