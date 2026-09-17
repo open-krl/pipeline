@@ -95,3 +95,69 @@ export interface ItineraryDiff {
 	unchangedCount: number;
 	summary: string;
 }
+
+/**
+ * Unified service cluster across day types (§9 Task 6.4).
+ */
+export interface CalendarServiceCluster {
+	serviceKey: string;
+	baseTrainNo: number;
+	originStation: string;
+	destStation: string;
+	lineName: string;
+	routeName: string;
+	isFakultatif: boolean;
+	runsWeekday: boolean;
+	runsSaturday: boolean;
+	runsSunday: boolean;
+	trainIds: string[];
+	relettered: boolean;
+	retimed: boolean;
+	maxDeltaSecs: number;
+	category:
+		| "daily"
+		| "weekday_only"
+		| "mon_sat"
+		| "weekend_only"
+		| "saturday_only"
+		| "sunday_only"
+		| "weekday_sunday";
+}
+
+export interface CalendarAnalysisResult {
+	timetableVersion: number;
+	source: "snapshots" | "database";
+	availableDayTypes: {
+		weekday: boolean;
+		saturday: boolean;
+		sunday: boolean;
+	};
+	totalServices: number;
+	totalTripsByDayType: {
+		weekday: number;
+		saturday: number;
+		sunday: number;
+	};
+	breakdown: {
+		daily: CalendarServiceCluster[];
+		weekdayOnly: CalendarServiceCluster[];
+		monSat: CalendarServiceCluster[];
+		weekendOnly: CalendarServiceCluster[];
+		saturdayOnly: CalendarServiceCluster[];
+		sundayOnly: CalendarServiceCluster[];
+		weekdaySunday: CalendarServiceCluster[];
+	};
+	stats: {
+		coreSharedCount: number;
+		coreSharedRatio: number;
+		reletteredCount: number;
+		retimedCount: number;
+		fakultatif: {
+			total: number;
+			weekdayActive: number;
+			weekendActive: number;
+			suspendedOnWeekend: number;
+		};
+	};
+	summary: string;
+}

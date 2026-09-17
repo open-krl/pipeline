@@ -11,6 +11,11 @@ import { formatSnapshotTable, getSnapshotList } from "./capture/snapshots";
 import { executeCensus } from "./census/census";
 import { type RegionScope, RegionScopeSchema } from "./config";
 import { resolveSafePath } from "./core/path";
+import {
+	analyzeDayTypeCalendar,
+	formatCalendarReport,
+	loadCalendarData,
+} from "./diagnostic/calendar";
 import { executeDiff } from "./diagnostic/cli-diff";
 import { executeExport } from "./export/export";
 
@@ -618,12 +623,95 @@ Export Time:        ${result.durationSecs}s
 			}
 		});
 
-	// 7. Future milestones
+	// 7. calendar
+	cli
+		.command(
+			"calendar [version]",
+			"Inspect three-way day-type set differences & schedule identity report (§9)",
+		)
+		.option("--data-dir <path>", "Override raw data root directory", {
+			default: "data/raw",
+		})
+		.option("--db-path <path>", "Override SQLite database path")
+		.option(
+			"--tolerance <seconds>",
+			"Arrival matching tolerance in seconds (default: 900)",
+		)
+		.option(
+			"--detail",
+			"Show detailed line-by-line breakdown and sample services",
+		)
+		.option("--json", "Emit structured JSON output")
+		.action(
+			async (
+				versionArg: string | undefined,
+				options: {
+					dataDir?: string;
+					dbPath?: string;
+					tolerance?: string | number;
+					detail?: boolean;
+					json?: boolean;
+				},
+			) => {
+				let version: number | undefined;
+				if (versionArg !== undefined) {
+					const trimmed = versionArg.trim();
+					const parsed = Number.parseInt(trimmed, 10);
+					if (
+						!/^\d+$/.test(trimmed) ||
+						!Number.isSafeInteger(parsed) ||
+						parsed <= 0
+					) {
+						console.error(
+							`Error: Invalid version number '${versionArg}'. Must be a positive integer.`,
+						);
+						process.exit(1);
+					}
+					version = parsed;
+				}
+
+				let tolerance: number | undefined;
+				if (options.tolerance !== undefined) {
+					const parsedTol = Number(options.tolerance);
+					if (!Number.isFinite(parsedTol) || parsedTol < 0) {
+						console.error("Error: --tolerance must be a non-negative number.");
+						process.exit(1);
+					}
+					tolerance = parsedTol;
+				}
+
+				try {
+					const data = await loadCalendarData({
+						version,
+						dataDir: options.dataDir,
+						dbPath: options.dbPath,
+					});
+
+					const result = analyzeDayTypeCalendar({
+						timetableVersion: data.version,
+						source: data.source,
+						weekdayTrips: data.weekdayTrips,
+						saturdayTrips: data.saturdayTrips,
+						sundayTrips: data.sundayTrips,
+						options: { toleranceSecs: tolerance },
+					});
+
+					if (options.json) {
+						console.log(JSON.stringify(result, null, 2));
+					} else {
+						console.log(formatCalendarReport(result, options.detail));
+					}
+				} catch (err) {
+					console.error(
+						`Calendar analysis failed: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+			},
+		);
+
+	// 8. Future milestones
 	const upcomingCommands = [
-		{
-			name: "calendar",
-			desc: "Inspect three-way day-type set differences & schedule identity report (§9)",
-		},
 		{
 			name: "detect",
 			desc: "Probe corridor hubs for timetable drift (§12)",

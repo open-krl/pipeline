@@ -179,20 +179,48 @@ describe("src/cli — CAC architecture", () => {
 		expect(parsed.options.dumpCsv).toBe("data/custom-csv");
 	});
 
+	it("parses calendar positional arguments and options", () => {
+		const cli = createCli();
+		const parsed = cli.parse(
+			[
+				"bun",
+				"src/cli.ts",
+				"calendar",
+				"2",
+				"--data-dir",
+				"data/custom-raw",
+				"--db-path",
+				"data/build/krl_v2.db",
+				"--tolerance",
+				"600",
+				"--detail",
+				"--json",
+			],
+			{ run: false },
+		);
+
+		expect(cli.matchedCommand?.name).toBe("calendar");
+		expect(parsed.args[0]).toBe("2");
+		expect(parsed.options.dataDir).toBe("data/custom-raw");
+		expect(parsed.options.dbPath).toBe("data/build/krl_v2.db");
+		expect(parsed.options.tolerance).toBe(600);
+		expect(parsed.options.detail).toBe(true);
+		expect(parsed.options.json).toBe(true);
+	});
+
 	it("executes remaining milestone stub commands cleanly", async () => {
 		const logs: string[] = [];
 		const origLog = console.log;
 		console.log = (msg: string) => logs.push(msg);
 
 		try {
-			for (const cmd of ["calendar", "detect"]) {
+			for (const cmd of ["detect"]) {
 				const cli = createCli();
 				cli.parse(["bun", "src/cli.ts", cmd], { run: false });
 				await cli.runMatchedCommand();
 			}
-			expect(logs.length).toBe(2);
-			expect(logs[0]).toContain("calendar");
-			expect(logs[1]).toContain("detect");
+			expect(logs.length).toBe(1);
+			expect(logs[0]).toContain("detect");
 		} finally {
 			console.log = origLog;
 		}

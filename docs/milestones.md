@@ -131,7 +131,7 @@ flowchart LR
   - Wire semantic diff summaries into Gate 1 (catalog) and Gate 2 (boards) in `krl capture` before the version-bump prompt.
   - Enforce degraded-baseline exclusion in Gate 1 & Gate 2 (compare only against `status: "complete"`).
   - Wire stop-level itinerary diff into `runStratifiedSpotCheck` in `src/census/sample.ts` to explain representative service divergence.
-- [ ] **Task 6.4: `krl calendar` (Out-of-DAG Empirical Inspection Tool)**
+- [x] **Task 6.4: `krl calendar` (Out-of-DAG Empirical Inspection Tool)**
   - Three-way set-difference report across `weekday`, `saturday`, and `sunday` powered by the shared trip-matching engine.
   - Identity breakdown identifying shared base schedules vs. weekend/fakultatif augmentations.
 - [ ] **Task 6.5: `krl detect` (Out-of-DAG Operational Drift Probe)**
