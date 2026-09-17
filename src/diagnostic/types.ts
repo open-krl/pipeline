@@ -161,3 +161,42 @@ export interface CalendarAnalysisResult {
 	};
 	summary: string;
 }
+
+/**
+ * Operational corridor drift probe results (§9 Task 6.5, §12).
+ */
+export interface StationDriftResult {
+	stationId: string;
+	stationName: string;
+	expectedCount: number;
+	liveCount: number;
+	identicalCount: number;
+	reletteredCount: number;
+	retimedCount: number;
+	addedCount: number;
+	withdrawnCount: number;
+}
+
+export type CorridorDriftStatus =
+	| "STABLE"
+	| "OPERATIONAL_VARIANCE"
+	| "POTENTIAL_EDITION_DRIFT";
+
+export interface DetectResult {
+	probeTimeWib: string;
+	timetableVersion: number;
+	baselineSource: "database" | "snapshots";
+	dayType: DayType;
+	dateStr: string;
+	stations: StationDriftResult[];
+	totalExpected: number;
+	totalLive: number;
+	totalIdentical: number;
+	totalRelettered: number;
+	totalRetimed: number;
+	totalAdded: number;
+	totalWithdrawn: number;
+	status: CorridorDriftStatus;
+	summary: string;
+	actionRecommendation?: string;
+}

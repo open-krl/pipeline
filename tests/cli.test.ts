@@ -208,21 +208,41 @@ describe("src/cli — CAC architecture", () => {
 		expect(parsed.options.json).toBe(true);
 	});
 
-	it("executes remaining milestone stub commands cleanly", async () => {
-		const logs: string[] = [];
-		const origLog = console.log;
-		console.log = (msg: string) => logs.push(msg);
+	it("parses detect positional arguments and options", () => {
+		const cli = createCli();
+		const parsed = cli.parse(
+			[
+				"bun",
+				"src/cli.ts",
+				"detect",
+				"1",
+				"--date",
+				"2026-09-17",
+				"--day-type",
+				"weekday",
+				"--db-path",
+				"data/build/krl_v1.db",
+				"--data-dir",
+				"data/raw",
+				"--holidays-path",
+				"data/holidays.json",
+				"--tolerance",
+				"900",
+				"--fail-on-drift",
+				"--json",
+			],
+			{ run: false },
+		);
 
-		try {
-			for (const cmd of ["detect"]) {
-				const cli = createCli();
-				cli.parse(["bun", "src/cli.ts", cmd], { run: false });
-				await cli.runMatchedCommand();
-			}
-			expect(logs.length).toBe(1);
-			expect(logs[0]).toContain("detect");
-		} finally {
-			console.log = origLog;
-		}
+		expect(cli.matchedCommand?.name).toBe("detect");
+		expect(parsed.args[0]).toBe("1");
+		expect(parsed.options.date).toBe("2026-09-17");
+		expect(parsed.options.dayType).toBe("weekday");
+		expect(parsed.options.dbPath).toBe("data/build/krl_v1.db");
+		expect(parsed.options.dataDir).toBe("data/raw");
+		expect(parsed.options.holidaysPath).toBe("data/holidays.json");
+		expect(parsed.options.tolerance).toBe(900);
+		expect(parsed.options.failOnDrift).toBe(true);
+		expect(parsed.options.json).toBe(true);
 	});
 });

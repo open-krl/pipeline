@@ -17,6 +17,7 @@ import {
 	loadCalendarData,
 } from "./diagnostic/calendar";
 import { executeDiff } from "./diagnostic/cli-diff";
+import { executeDetect, formatDetectReport } from "./diagnostic/detect";
 import { executeExport } from "./export/export";
 
 export function createCli() {
@@ -710,21 +711,132 @@ Export Time:        ${result.durationSecs}s
 			},
 		);
 
-	// 8. Future milestones
-	const upcomingCommands = [
-		{
-			name: "detect",
-			desc: "Probe corridor hubs for timetable drift (§12)",
-		},
-	];
+	// 8. detect
+	cli
+		.command(
+			"detect [version]",
+			"Probe corridor hub departure boards for timetable drift (§9, §12)",
+		)
+		.option("--date <YYYY-MM-DD>", "Target date for day-type resolution")
+		.option(
+			"--day-type <type>",
+			"Explicit day type override (weekday, saturday, sunday, holiday)",
+		)
+		.option("--db-path <path>", "Override SQLite database path")
+		.option("--data-dir <path>", "Override raw data root directory", {
+			default: "data/raw",
+		})
+		.option("--holidays-path <path>", "Override holidays file path", {
+			default: "data/holidays.json",
+		})
+		.option(
+			"--tolerance <seconds>",
+			"Arrival matching tolerance in seconds (default: 900)",
+		)
+		.option(
+			"--fail-on-drift",
+			"Exit with code 1 if potential timetable edition drift is detected",
+		)
+		.option("--json", "Emit structured JSON output")
+		.action(
+			async (
+				versionArg: string | undefined,
+				options: {
+					date?: string;
+					dayType?: string;
+					dbPath?: string;
+					dataDir?: string;
+					holidaysPath?: string;
+					tolerance?: string | number;
+					failOnDrift?: boolean;
+					json?: boolean;
+				},
+			) => {
+				let version: number | undefined;
+				if (versionArg !== undefined) {
+					const trimmed = versionArg.trim();
+					const parsed = Number.parseInt(trimmed, 10);
+					if (
+						!/^\d+$/.test(trimmed) ||
+						!Number.isSafeInteger(parsed) ||
+						parsed <= 0
+					) {
+						console.error(
+							`Error: Invalid version number '${versionArg}'. Must be a positive integer.`,
+						);
+						process.exit(1);
+					}
+					version = parsed;
+				}
 
-	for (const { name, desc } of upcomingCommands) {
-		cli.command(name, desc).action(() => {
-			console.log(
-				`Command '${name}' will be implemented in upcoming milestone.`,
-			);
-		});
-	}
+				let parsedDate: Date | undefined;
+				if (options.date !== undefined) {
+					if (!/^\d{4}-\d{2}-\d{2}$/.test(options.date)) {
+						console.error(
+							`Error: Invalid date format '${options.date}'. Expected YYYY-MM-DD.`,
+						);
+						process.exit(1);
+					}
+					parsedDate = new Date(`${options.date}T00:00:00+07:00`);
+					if (Number.isNaN(parsedDate.getTime())) {
+						console.error(`Error: Invalid calendar date '${options.date}'.`);
+						process.exit(1);
+					}
+				}
+
+				let dayType: DayType | undefined;
+				if (options.dayType !== undefined) {
+					const parsedDayType = DayTypeSchema.safeParse(options.dayType);
+					if (!parsedDayType.success) {
+						console.error(
+							`Error: Invalid day type '${options.dayType}'. Must be weekday, saturday, sunday, or holiday.`,
+						);
+						process.exit(1);
+					}
+					dayType = parsedDayType.data;
+				}
+
+				let tolerance: number | undefined;
+				if (options.tolerance !== undefined) {
+					const parsedTol = Number(options.tolerance);
+					if (!Number.isFinite(parsedTol) || parsedTol < 0) {
+						console.error("Error: --tolerance must be a non-negative number.");
+						process.exit(1);
+					}
+					tolerance = parsedTol;
+				}
+
+				try {
+					const result = await executeDetect({
+						version,
+						date: parsedDate,
+						dayType,
+						dbPath: options.dbPath,
+						dataDir: options.dataDir,
+						holidaysPath: options.holidaysPath,
+						toleranceSecs: tolerance,
+					});
+
+					if (options.json) {
+						console.log(JSON.stringify(result, null, 2));
+					} else {
+						console.log(formatDetectReport(result));
+					}
+
+					if (
+						options.failOnDrift &&
+						result.status === "POTENTIAL_EDITION_DRIFT"
+					) {
+						process.exit(1);
+					}
+				} catch (err) {
+					console.error(
+						`Drift detection failed: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+			},
+		);
 
 	cli.help();
 	cli.version("0.1.0");
