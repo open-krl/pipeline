@@ -124,7 +124,7 @@ flowchart LR
   - Fingerprint-based trip matching ($\text{base\_train\_no}$, origin, dest, arrival $\pm$ tolerance) distinguishing re-lettering (`5022D → 5022E`), retimed departures ($\pm\Delta$ mins), and added/withdrawn trips.
   - Stop-level itinerary diffing (sequence changes, added/removed stops, dwell & transit $\pm\Delta$ seconds).
   - Day-type awareness classifying cross-day comparisons as expected calendar variance vs same-day comparisons as edition drift.
-- [ ] **Task 6.2: `krl diff` CLI Tool (`src/diagnostic/cli-diff.ts`)**
+- [x] **Task 6.2: `krl diff` CLI Tool (`src/diagnostic/cli-diff.ts`)**
   - Standalone command to diff two snapshots (`krl diff 1:1 1:3` or `krl diff --v1 1 --v2 2`) or two itinerary envelopes (`krl diff --train 5022D 5022E`).
   - Ephemeral terminal rendering with summary metrics and station/trip drill-down flags (`--summary`, `--detail`).
 - [ ] **Task 6.3: Capture Gate & Census Spot-Check Semantic Integration**

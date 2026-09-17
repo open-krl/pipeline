@@ -11,6 +11,7 @@ import { formatSnapshotTable, getSnapshotList } from "./capture/snapshots";
 import { executeCensus } from "./census/census";
 import { type RegionScope, RegionScopeSchema } from "./config";
 import { resolveSafePath } from "./core/path";
+import { executeDiff } from "./diagnostic/cli-diff";
 import { executeExport } from "./export/export";
 
 export function createCli() {
@@ -565,6 +566,57 @@ Export Time:        ${result.durationSecs}s
 				}
 			},
 		);
+
+	// 6. diff
+	cli
+		.command(
+			"diff [...snapshots]",
+			"Diff station catalogs, departure boards, or train itineraries (§8.1, §9)",
+		)
+		.option("--data-dir <path>", "Override raw data root directory", {
+			default: "data/raw",
+		})
+		.option("--v1 <version>", "First timetable version to compare")
+		.option("--v2 <version>", "Second timetable version to compare")
+		.option(
+			"--train <trainIds...>",
+			"Trip IDs to diff itineraries (e.g. --train 5022D 5022E)",
+		)
+		.option("--day-type <type>", "Target day type for itinerary comparison")
+		.option(
+			"--detail",
+			"Display full station-by-station and stop-by-stop listings",
+		)
+		.action(async (...actionArgs: unknown[]) => {
+			const options = (actionArgs[actionArgs.length - 1] ?? {}) as {
+				dataDir?: string;
+				v1?: number | string;
+				v2?: number | string;
+				train?: string | string[];
+				dayType?: string;
+				detail?: boolean;
+			};
+			const rawSnapshots = actionArgs.slice(0, -1);
+			const args: string[] = [];
+			for (const a of rawSnapshots) {
+				if (Array.isArray(a)) {
+					for (const item of a) {
+						if (typeof item === "string") args.push(item);
+					}
+				} else if (typeof a === "string") {
+					args.push(a);
+				}
+			}
+
+			try {
+				await executeDiff(args, options);
+			} catch (err) {
+				console.error(
+					`Diff failed: ${err instanceof Error ? err.message : String(err)}`,
+				);
+				process.exit(1);
+			}
+		});
 
 	// 7. Future milestones
 	const upcomingCommands = [
