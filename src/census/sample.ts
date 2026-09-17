@@ -2,6 +2,7 @@
 import type { KciClient } from "../api/client";
 import type { DayType } from "../archive/schemas";
 import { payloadHash } from "../core/canonical";
+import { diffItineraries } from "../diagnostic/itinerary";
 import type { DiscoveredTrain } from "./discovery";
 import { getItineraryPath, readItineraryEnvelope } from "./envelope";
 
@@ -11,6 +12,7 @@ export interface StratifiedDivergence {
 	baselineDayType: DayType;
 	baselineHash: string;
 	liveHash: string;
+	diffSummary?: string;
 }
 
 export interface StratifiedCheckResult {
@@ -146,12 +148,19 @@ export async function runStratifiedSpotCheck(params: {
 
 		const liveHash = payloadHash(liveResponse.data);
 		if (liveHash !== baselineObs.payload_hash) {
+			const diff = diffItineraries(
+				train.trainId,
+				baselineObs.stops,
+				train.trainId,
+				liveResponse.data,
+			);
 			divergences.push({
 				stratum,
 				trainId: train.trainId,
 				baselineDayType,
 				baselineHash: baselineObs.payload_hash,
 				liveHash,
+				diffSummary: diff.summary,
 			});
 		}
 	}

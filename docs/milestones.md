@@ -127,7 +127,7 @@ flowchart LR
 - [x] **Task 6.2: `krl diff` CLI Tool (`src/diagnostic/cli-diff.ts`)**
   - Standalone command to diff two snapshots (`krl diff 1:1 1:3` or `krl diff --v1 1 --v2 2`) or two itinerary envelopes (`krl diff --train 5022D 5022E`).
   - Ephemeral terminal rendering with summary metrics and station/trip drill-down flags (`--summary`, `--detail`).
-- [ ] **Task 6.3: Capture Gate & Census Spot-Check Semantic Integration**
+- [x] **Task 6.3: Capture Gate & Census Spot-Check Semantic Integration**
   - Wire semantic diff summaries into Gate 1 (catalog) and Gate 2 (boards) in `krl capture` before the version-bump prompt.
   - Enforce degraded-baseline exclusion in Gate 1 & Gate 2 (compare only against `status: "complete"`).
   - Wire stop-level itinerary diff into `runStratifiedSpotCheck` in `src/census/sample.ts` to explain representative service divergence.
