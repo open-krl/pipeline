@@ -10,6 +10,25 @@ export interface StationEntity {
 }
 
 /**
+ * Validates that latitude and longitude are finite numbers within standard WGS-84 bounds.
+ */
+export function isValidCoordinate(
+	lat: number | null,
+	lon: number | null,
+): boolean {
+	return (
+		lat !== null &&
+		lon !== null &&
+		Number.isFinite(lat) &&
+		Number.isFinite(lon) &&
+		lat >= -90 &&
+		lat <= 90 &&
+		lon >= -180 &&
+		lon <= 180
+	);
+}
+
+/**
  * Maps database stations into GTFS StopRow records.
  * Strictly asserts that every station actively referenced in trip_stops has valid coordinates.
  */
@@ -21,7 +40,7 @@ export function generateStopRows(
 
 	for (const staId of activeStationIds) {
 		const st = allStations.find((s) => s.sta_id === staId);
-		if (!st || st.lat === null || st.lon === null) {
+		if (!st || !isValidCoordinate(st.lat, st.lon)) {
 			missingCoords.push(staId);
 		}
 	}
@@ -35,16 +54,19 @@ export function generateStopRows(
 	// Export all active stations (and any other catalog stations that possess valid coordinates)
 	const rows: StopRow[] = [];
 	for (const s of allStations) {
-		if (activeStationIds.has(s.sta_id) || (s.lat !== null && s.lon !== null)) {
-			if (s.lat !== null && s.lon !== null) {
-				rows.push({
-					stop_id: s.sta_id,
-					stop_name: s.sta_name,
-					stop_lat: s.lat,
-					stop_lon: s.lon,
-					location_type: 0,
-				});
-			}
+		if (
+			s.lat !== null &&
+			s.lon !== null &&
+			isValidCoordinate(s.lat, s.lon) &&
+			(activeStationIds.has(s.sta_id) || true)
+		) {
+			rows.push({
+				stop_id: s.sta_id,
+				stop_name: s.sta_name,
+				stop_lat: s.lat,
+				stop_lon: s.lon,
+				location_type: 0,
+			});
 		}
 	}
 

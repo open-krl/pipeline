@@ -65,6 +65,14 @@ describe("src/export/tables — Table Generators", () => {
 			"active stations missing WGS-84 coordinates in database: YOG",
 		);
 
+		// Case 3: active station with out-of-bounds coordinates throws error
+		const outOfBoundsStations = [
+			{ sta_id: "BAD", sta_name: "BAD_LAT", lat: 95.0, lon: 106.8501 },
+		];
+		expect(() =>
+			generateStopRows(outOfBoundsStations, new Set(["BAD"])),
+		).toThrow("active stations missing WGS-84 coordinates in database: BAD");
+
 		const csv = formatStopsCsv(rows);
 		expect(csv).toContain(
 			"stop_id,stop_name,stop_lat,stop_lon,location_type\r\n",
