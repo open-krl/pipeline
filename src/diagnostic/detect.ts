@@ -61,7 +61,7 @@ function loadStationDeparturesFromDb(
 		trip_id: string;
 		line_name: string;
 		route_name_raw: string;
-		dest_station_id: string;
+		dest: string;
 		dest_time: string;
 		color: string;
 		time_raw: string;
@@ -69,7 +69,7 @@ function loadStationDeparturesFromDb(
 
 	const rows = db
 		.query<StopRow, [number, string]>(
-			`SELECT t.trip_id, t.line_name, t.route_name_raw, t.dest_station_id, t.dest_time, t.color, s.time_raw
+			`SELECT t.trip_id, t.line_name, t.route_name_raw, COALESCE(t.headsign, t.dest_station_id) as dest, t.dest_time, t.color, s.time_raw
 			 FROM trip_stops s
 			 JOIN trips t ON s.timetable_version = t.timetable_version AND s.trip_id = t.trip_id
 			 JOIN trip_calendar c ON s.timetable_version = c.timetable_version AND s.trip_id = c.trip_id
@@ -85,7 +85,7 @@ function loadStationDeparturesFromDb(
 		train_id: r.trip_id,
 		ka_name: r.line_name,
 		route_name: r.route_name_raw,
-		dest: r.dest_station_id,
+		dest: r.dest,
 		time_est: r.time_raw,
 		color: r.color,
 		dest_time: r.dest_time,
@@ -267,8 +267,7 @@ export async function executeDetect(
 			"Minor operational variances observed. Congruence remains high; no edition bump required.";
 	} else {
 		status = "STABLE";
-		actionRecommendation =
-			"Timetable is 100% congruent across all 3 key corridor hubs.";
+		actionRecommendation = `Timetable is stable (${(congruenceRatio * 100).toFixed(1)}% congruent) across ${targetStations.length} probed station(s).`;
 	}
 
 	const probeTimeWib = new Intl.DateTimeFormat("en-CA", {

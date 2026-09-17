@@ -56,6 +56,7 @@ describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 				base_train_no INTEGER NOT NULL,
 				line_name TEXT NOT NULL,
 				route_name_raw TEXT NOT NULL,
+				headsign TEXT NOT NULL,
 				dest_station_id TEXT NOT NULL,
 				dest_time TEXT NOT NULL,
 				color TEXT NOT NULL,
@@ -80,17 +81,17 @@ describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 			);
 
 			-- MRI departure
-			INSERT INTO trips VALUES (1, '5001', 5001, 'Commuter Line Bogor', 'JAKK-BOO', 'BOO', '07:30:00', '#ED1B24');
+			INSERT INTO trips VALUES (1, '5001', 5001, 'Commuter Line Bogor', 'JAKK-BOO', 'BOGOR', 'BOO', '07:30:00', '#ED1B24');
 			INSERT INTO trip_stops VALUES (1, '5001', 1, 'MRI', '07:00:00', 25200);
 			INSERT INTO trip_calendar VALUES (1, '5001', 1, 1, 1);
 
 			-- BKS departure
-			INSERT INTO trips VALUES (1, '5101', 5101, 'Commuter Line Cikarang', 'PSE-CKR', 'CKR', '08:45:00', '#0072C6');
+			INSERT INTO trips VALUES (1, '5101', 5101, 'Commuter Line Cikarang', 'PSE-CKR', 'CIKARANG', 'CKR', '08:45:00', '#0072C6');
 			INSERT INTO trip_stops VALUES (1, '5101', 1, 'BKS', '08:00:00', 28800);
 			INSERT INTO trip_calendar VALUES (1, '5101', 1, 1, 1);
 
 			-- RK departure
-			INSERT INTO trips VALUES (1, '1901', 1901, 'Commuter Line Rangkasbitung', 'THB-RK', 'RK', '09:30:00', '#2E7D32');
+			INSERT INTO trips VALUES (1, '1901', 1901, 'Commuter Line Rangkasbitung', 'THB-RK', 'RANGKASBITUNG', 'RK', '09:30:00', '#2E7D32');
 			INSERT INTO trip_stops VALUES (1, '1901', 1, 'RK', '09:00:00', 32400);
 			INSERT INTO trip_calendar VALUES (1, '1901', 1, 1, 1);
 		`);
@@ -105,7 +106,7 @@ describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 						train_id: "5001",
 						ka_name: "Commuter Line Bogor",
 						route_name: "JAKK-BOO",
-						dest: "BOO",
+						dest: "BOGOR",
 						time_est: "07:00:00",
 						color: "#ED1B24",
 						dest_time: "07:30:00",
@@ -119,7 +120,7 @@ describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 						train_id: "5101",
 						ka_name: "Commuter Line Cikarang",
 						route_name: "PSE-CKR",
-						dest: "CKR",
+						dest: "CIKARANG",
 						time_est: "08:00:00",
 						color: "#0072C6",
 						dest_time: "08:45:00",
@@ -133,7 +134,7 @@ describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 						train_id: "1901",
 						ka_name: "Commuter Line Rangkasbitung",
 						route_name: "THB-RK",
-						dest: "RK",
+						dest: "RANGKASBITUNG",
 						time_est: "09:00:00",
 						color: "#2E7D32",
 						dest_time: "09:30:00",
@@ -177,6 +178,7 @@ describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 				base_train_no INTEGER NOT NULL,
 				line_name TEXT NOT NULL,
 				route_name_raw TEXT NOT NULL,
+				headsign TEXT NOT NULL,
 				dest_station_id TEXT NOT NULL,
 				dest_time TEXT NOT NULL,
 				color TEXT NOT NULL,
@@ -206,7 +208,7 @@ describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 			const tid = `500${i}A`;
 			const base = 5000 + i;
 			diskDb.run(
-				`INSERT INTO trips VALUES (1, '${tid}', ${base}, 'Commuter Line Bogor', 'JAKK-BOO', 'BOO', '08:00:00', '#ED1B24')`,
+				`INSERT INTO trips VALUES (1, '${tid}', ${base}, 'Commuter Line Bogor', 'JAKK-BOO', 'BOGOR', 'BOO', '08:00:00', '#ED1B24')`,
 			);
 			diskDb.run(
 				`INSERT INTO trip_stops VALUES (1, '${tid}', 1, 'MRI', '07:00:00', 25200)`,
@@ -222,7 +224,7 @@ describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 				train_id: `500${i}B`,
 				ka_name: "Commuter Line Bogor",
 				route_name: "JAKK-BOO",
-				dest: "BOO",
+				dest: "BOGOR",
 				time_est: "07:00:00",
 				color: "#ED1B24",
 				dest_time: "08:00:00",
@@ -343,6 +345,105 @@ describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 			await fs
 				.rm(scratchRawDir, { recursive: true, force: true })
 				.catch(() => {});
+		}
+	});
+
+	it("detects OPERATIONAL_VARIANCE when corridor exhibits bounded retiming", async () => {
+		const scratchDir = "scratch";
+		await fs.mkdir(scratchDir, { recursive: true });
+		const testDbPath = "scratch/test_detect_variance.db";
+
+		const diskDb = new Database(testDbPath);
+		diskDb.run(`
+			CREATE TABLE trips (
+				timetable_version INTEGER NOT NULL,
+				trip_id TEXT NOT NULL,
+				base_train_no INTEGER NOT NULL,
+				line_name TEXT NOT NULL,
+				route_name_raw TEXT NOT NULL,
+				headsign TEXT NOT NULL,
+				dest_station_id TEXT NOT NULL,
+				dest_time TEXT NOT NULL,
+				color TEXT NOT NULL,
+				PRIMARY KEY (timetable_version, trip_id)
+			);
+			CREATE TABLE trip_stops (
+				timetable_version INTEGER NOT NULL,
+				trip_id TEXT NOT NULL,
+				stop_sequence INTEGER NOT NULL,
+				station_id TEXT NOT NULL,
+				time_raw TEXT NOT NULL,
+				departure_secs INTEGER,
+				PRIMARY KEY (timetable_version, trip_id, stop_sequence)
+			);
+			CREATE TABLE trip_calendar (
+				timetable_version INTEGER NOT NULL,
+				trip_id TEXT NOT NULL,
+				runs_weekday INTEGER NOT NULL,
+				runs_saturday INTEGER NOT NULL,
+				runs_sunday INTEGER NOT NULL,
+				PRIMARY KEY (timetable_version, trip_id)
+			);
+		`);
+
+		// Seed 10 trips in baseline
+		for (let i = 1; i <= 10; i++) {
+			const tid = `500${i}A`;
+			const base = 5000 + i;
+			const depSecs = 25200 + i * 600; // starts 07:00, every 10m
+			const depTime = `${String(Math.floor(depSecs / 3600)).padStart(2, "0")}:${String(Math.floor((depSecs % 3600) / 60)).padStart(2, "0")}:00`;
+			diskDb.run(
+				`INSERT INTO trips VALUES (1, '${tid}', ${base}, 'Commuter Line Bogor', 'JAKK-BOO', 'BOGOR', 'BOO', '08:30:00', '#ED1B24')`,
+			);
+			diskDb.run(
+				`INSERT INTO trip_stops VALUES (1, '${tid}', 1, 'MRI', '${depTime}', ${depSecs})`,
+			);
+			diskDb.run(`INSERT INTO trip_calendar VALUES (1, '${tid}', 1, 1, 1)`);
+		}
+		diskDb.close();
+
+		// Live data: 9 identical, 1 retimed by 3 minutes (180s)
+		const liveMriData = [];
+		for (let i = 1; i <= 10; i++) {
+			const tid = `500${i}A`;
+			let depSecs = 25200 + i * 600;
+			if (i === 1) depSecs += 180; // Retimed by +3 mins
+			const depTime = `${String(Math.floor(depSecs / 3600)).padStart(2, "0")}:${String(Math.floor((depSecs % 3600) / 60)).padStart(2, "0")}:00`;
+			liveMriData.push({
+				train_id: tid,
+				ka_name: "Commuter Line Bogor",
+				route_name: "JAKK-BOO",
+				dest: "BOGOR",
+				time_est: depTime,
+				color: "#ED1B24",
+				dest_time: "08:30:00",
+			});
+		}
+
+		const client = createMockClient({
+			MRI: { status: 200, data: liveMriData },
+			BKS: { status: 200, data: [] },
+			RK: { status: 200, data: [] },
+		});
+
+		try {
+			const result = await executeDetect({
+				client,
+				dbPath: testDbPath,
+				version: 1,
+				dayType: "weekday",
+				stations: ["MRI"],
+			});
+
+			expect(result.status).toBe("OPERATIONAL_VARIANCE");
+			expect(result.totalExpected).toBe(10);
+			expect(result.totalIdentical).toBe(9);
+			expect(result.totalRetimed).toBe(1);
+			expect(result.actionRecommendation).toContain(
+				"Minor operational variances observed",
+			);
+		} finally {
+			await fs.unlink(testDbPath).catch(() => {});
 		}
 	});
 });
