@@ -118,7 +118,7 @@ flowchart LR
 
 ---
 
-### Milestone 6: Operational & Diagnostic Tooling ⚪ (Planned)
+### Milestone 6: Operational & Diagnostic Tooling 🟡 (Next Up)
 - [ ] **Task 6.1: `krl calendar` (Out-of-DAG Empirical Inspection Tool)**
   - Three-way set-difference report across `weekday`, `saturday`, and `sunday`.
   - Identity breakdown identifying shared base schedules vs. weekend/fakultatif augmentations.
