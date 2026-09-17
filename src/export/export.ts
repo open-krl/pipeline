@@ -99,20 +99,24 @@ export async function executeExport(
 	try {
 		// 2. Query Version and Snapshots
 		const versionRow = db
-			.query<{ timetable_version: number }, []>(
-				"SELECT DISTINCT timetable_version FROM trips LIMIT 1",
+			.query<{ timetable_version: number }, [number] | []>(
+				version !== undefined
+					? "SELECT DISTINCT timetable_version FROM trips WHERE timetable_version = ? LIMIT 1"
+					: "SELECT DISTINCT timetable_version FROM trips LIMIT 1",
 			)
-			.get();
+			.get(...(version !== undefined ? [version] : []));
 		if (!versionRow) {
-			throw new Error(`Database at ${dbPath} contains no compiled trips`);
+			throw new Error(
+				`Database at ${dbPath} contains no compiled trips for version ${version ?? "any"}`,
+			);
 		}
-		const resolvedVersion = version ?? versionRow.timetable_version;
+		const resolvedVersion = versionRow.timetable_version;
 
 		const snapshots = db
-			.query<{ snapshot_date: string }, []>(
-				"SELECT snapshot_date FROM snapshots ORDER BY snapshot_date ASC",
+			.query<{ snapshot_date: string }, [number]>(
+				"SELECT snapshot_date FROM snapshots WHERE timetable_version = ? ORDER BY snapshot_date ASC",
 			)
-			.all();
+			.all(resolvedVersion);
 
 		// 3. Resolve Feed Validity Window (start_date, end_date)
 		let startDate: string;
@@ -160,23 +164,25 @@ export async function executeExport(
 					runs_sunday: number;
 					calendar_state: string;
 				},
-				[]
+				[number]
 			>(
 				`SELECT t.trip_id, t.line_name, t.headsign, t.color, t.is_fakultatif, t.itinerary_status,
 				        c.runs_weekday, c.runs_saturday, c.runs_sunday, c.calendar_state
 				 FROM trips t
 				 JOIN trip_calendar c ON t.timetable_version = c.timetable_version AND t.trip_id = c.trip_id
+				 WHERE t.timetable_version = ?
 				 ORDER BY t.trip_id ASC`,
 			)
-			.all();
+			.all(resolvedVersion);
 
 		const rawStops = db
-			.query<TripStopEntity, []>(
+			.query<TripStopEntity, [number]>(
 				`SELECT trip_id, stop_sequence, station_id, arrival_secs, departure_secs
 				 FROM trip_stops
+				 WHERE timetable_version = ?
 				 ORDER BY trip_id ASC, stop_sequence ASC`,
 			)
-			.all();
+			.all(resolvedVersion);
 
 		const rawHolidays = db
 			.query<HolidayEntity, []>(
