@@ -1,6 +1,6 @@
 import type { CAC } from "cac";
+import { executeCapture } from "../../capture/capture";
 import { commitCaptureSnapshot } from "../../capture/commit";
-import { executeCapture } from "../../capture/pipeline";
 import { confirm } from "../../core/prompt";
 import { parseDataDir, parseDayType, parseRegion } from "../shared/parse";
 
