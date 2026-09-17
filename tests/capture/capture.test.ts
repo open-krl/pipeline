@@ -262,7 +262,7 @@ describe("src/capture/capture", () => {
 		expect(result.snapshot_id).toBe(1);
 	});
 
-	it("Gate 2 halts capture when board signatures diverge for same day type without consent", async () => {
+	it("Gate 2 leaves a provisional snapshot on disk when operator declines version bump", async () => {
 		const client1 = createMockClient();
 		await executeCapture({
 			client: client1,
@@ -288,20 +288,31 @@ describe("src/capture/capture", () => {
 		const client2 = createMockClient({ mriBoard: mutatedMriBoard });
 
 		let gate2Prompt = "";
-		// Operator declines bump
-		await expect(
-			executeCapture({
-				client: client2,
-				dataDir: TEST_SCRATCH_DIR,
-				dayType: "weekday",
-				promptFn: async (msg) => {
-					gate2Prompt = msg;
-					return false;
-				},
-			}),
-		).rejects.toThrow("Gate 2 Alert");
+		// Operator declines bump — should NOT throw, should leave provisional
+		const result = await executeCapture({
+			client: client2,
+			dataDir: TEST_SCRATCH_DIR,
+			dayType: "weekday",
+			promptFn: async (msg) => {
+				gate2Prompt = msg;
+				return false;
+			},
+		});
+
 		expect(gate2Prompt).toContain("[Gate 2 Alert]");
 		expect(gate2Prompt).toContain("[Edition Drift] 1 retimed");
+
+		// Snapshot must be on disk as "provisional"
+		expect(result.manifest.status).toBe("provisional");
+		expect(result.timetable_version).toBe(1);
+		expect(result.snapshot_id).toBe(2);
+
+		// The provisional directory must exist and be diffable
+		const manifestFile = await fs.readFile(
+			path.join(result.snapshot_dir, "manifest.json"),
+			"utf-8",
+		);
+		expect(JSON.parse(manifestFile).status).toBe("provisional");
 	});
 
 	it("Gate 2 increments version when operator confirms timetable edition revision", async () => {
@@ -337,6 +348,15 @@ describe("src/capture/capture", () => {
 
 		expect(result.timetable_version).toBe(2);
 		expect(result.snapshot_id).toBe(1);
+		expect(result.manifest.status).toBe("complete");
+
+		// The provisional snapshot written under v1 during gate evaluation must be cleaned up
+		const v1CapturesDir = path.join(TEST_SCRATCH_DIR, "1", "captures");
+		const v1Entries = await fs
+			.readdir(v1CapturesDir)
+			.catch(() => [] as string[]);
+		// Only snapshot 1 (the original complete) should remain; no leftover provisional
+		expect(v1Entries.filter((e) => !e.startsWith(".tmp_"))).toEqual(["1"]);
 	});
 
 	it("marks snapshot as degraded if a station fails to fetch but others succeed", async () => {

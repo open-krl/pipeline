@@ -1,5 +1,7 @@
+import * as fs from "node:fs/promises";
 import type { DepartureBoardItem, StationItem } from "../api/schemas";
-import type { DayType } from "../archive/schemas";
+import { manifestPath } from "../archive/layout";
+import type { CaptureManifest, DayType } from "../archive/schemas";
 import {
 	readSnapshotBoards,
 	readSnapshotStations,
@@ -25,6 +27,8 @@ export interface Gate1Result {
 	shouldBumpVersion: boolean;
 }
 
+export type Gate2Verdict = "accept" | "bump" | "quit";
+
 export interface Gate2Params {
 	dataDir: string;
 	versionToUse: number;
@@ -39,8 +43,24 @@ export interface Gate2Params {
 }
 
 export interface Gate2Result {
+	verdict: Gate2Verdict;
 	versionToUse: number;
 	shouldBumpVersion: boolean;
+}
+
+/**
+ * Promotes an on-disk provisional snapshot manifest to "complete" in-place.
+ * Used after the operator accepts a hash-divergent capture.
+ */
+export async function promoteSnapshotToDisk(params: {
+	dataDir: string;
+	version: number;
+	snapshotId: number;
+	manifest: CaptureManifest;
+}): Promise<void> {
+	const promoted: CaptureManifest = { ...params.manifest, status: "complete" };
+	const mPath = manifestPath(params.dataDir, params.version, params.snapshotId);
+	await fs.writeFile(mPath, JSON.stringify(promoted, null, 2), "utf-8");
 }
 
 /**
@@ -51,7 +71,6 @@ async function resolveHashMismatchAlert(params: {
 	gateName: string;
 	promptMsg: string;
 	nonInteractiveReason: string;
-	abortReason: string;
 	yes: boolean;
 	prompt: PromptFn;
 }): Promise<void> {
@@ -61,7 +80,9 @@ async function resolveHashMismatchAlert(params: {
 
 	const confirmed = await params.prompt(params.promptMsg, false);
 	if (!confirmed) {
-		throw new Error(params.abortReason);
+		throw new Error(
+			`[Gate ${params.gateName} Alert] Capture aborted by operator.`,
+		);
 	}
 }
 
@@ -144,7 +165,6 @@ export async function evaluateGate1(params: Gate1Params): Promise<Gate1Result> {
 			promptMsg,
 			nonInteractiveReason:
 				"Capture halted by Gate 1 in non-interactive mode: station master hash mutated without --new-version flag.",
-			abortReason: `[Gate 1 Alert] Capture aborted by operator: station master hash mismatch with active version ${activeVersion}.`,
 			yes: params.yes,
 			prompt: params.prompt,
 		});
@@ -164,11 +184,19 @@ export async function evaluateGate1(params: Gate1Params): Promise<Gate1Result> {
 }
 
 /**
- * Gate 2: Compares board signature against existing same-day-type snapshots (§8.1).
+ * Gate 2: Compares board signature against existing same-day-type complete
+ * snapshots (§8.1). Returns a verdict instead of throwing on operator decline,
+ * so the provisional snapshot already written to disk is never lost.
+ *
+ * Verdicts:
+ *   "accept" — hash matches or operator accepted the divergence → promote to complete
+ *   "bump"   — operator chose to fork into the next timetable version
+ *   "quit"   — operator deferred the decision → leave snapshot as provisional
  */
 export async function evaluateGate2(params: Gate2Params): Promise<Gate2Result> {
 	if (params.shouldBumpVersion) {
 		return {
+			verdict: "accept",
 			versionToUse: params.versionToUse,
 			shouldBumpVersion: true,
 		};
@@ -209,18 +237,28 @@ export async function evaluateGate2(params: Gate2Params): Promise<Gate2Result> {
 					})
 				: "";
 
-			const promptMsg = `[Gate 2 Alert] Board signature differs for day type '${params.resolvedDayType}' compared to snapshot ${sameDayTypeSnapshot.id} (${existingHash.slice(0, 8)} -> ${params.currentBoardResponseHash.slice(0, 8)}).${diffSummary}\nPotential timetable edition revision. Increment timetable version to ${params.versionToUse + 1}?`;
+			if (params.yes) {
+				throw new Error(
+					`[Gate 2 Alert] Capture halted in non-interactive mode: board response signature differs for day type '${params.resolvedDayType}' without --new-version flag.`,
+				);
+			}
 
-			await resolveHashMismatchAlert({
-				gateName: "2",
-				promptMsg,
-				nonInteractiveReason: `[Gate 2 Alert] Capture halted in non-interactive mode: board response signature differs for day type '${params.resolvedDayType}' without --new-version flag.`,
-				abortReason: `[Gate 2 Alert] Capture aborted by operator: board response signature differs for day type '${params.resolvedDayType}'.`,
-				yes: params.yes,
-				prompt: params.prompt,
-			});
+			const promptMsg = `[Gate 2 Alert] Board signature differs for day type '${params.resolvedDayType}' compared to snapshot ${sameDayTypeSnapshot.id} (${existingHash.slice(0, 8)} -> ${params.currentBoardResponseHash.slice(0, 8)}).${diffSummary}\nCapture saved as provisional. Increment timetable version to ${params.versionToUse + 1}? [y/n/q - quit and inspect later]`;
 
+			const answer = await params.prompt(promptMsg, false);
+
+			if (answer === null || answer === false) {
+				// Operator typed 'q' or declined: leave snapshot as provisional for later inspection
+				return {
+					verdict: "quit",
+					versionToUse: params.versionToUse,
+					shouldBumpVersion: false,
+				};
+			}
+
+			// Operator confirmed bump
 			return {
+				verdict: "bump",
 				versionToUse: params.versionToUse + 1,
 				shouldBumpVersion: true,
 			};
@@ -228,6 +266,7 @@ export async function evaluateGate2(params: Gate2Params): Promise<Gate2Result> {
 	}
 
 	return {
+		verdict: "accept",
 		versionToUse: params.versionToUse,
 		shouldBumpVersion: false,
 	};

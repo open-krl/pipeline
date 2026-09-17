@@ -30,6 +30,8 @@ export interface WriteSnapshotParams {
 	isDegraded: boolean;
 	stationsResponse: StationMasterResponse;
 	rawBoardsMap: Map<string, DepartureBoardResponse>;
+	/** Explicit status override. When omitted, falls back to "degraded" or "complete" based on isDegraded. */
+	status?: CaptureManifest["status"];
 }
 
 /**
@@ -94,7 +96,7 @@ export async function writeSnapshotToDisk(
 			station_master_hash: params.currentStationMasterHash,
 			board_response_hash: params.currentBoardResponseHash,
 			fetched_at: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
-			status: params.isDegraded ? "degraded" : "complete",
+			status: params.status ?? (params.isDegraded ? "degraded" : "complete"),
 		};
 
 		CaptureManifestSchema.parse(manifest);

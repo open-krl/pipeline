@@ -1,3 +1,4 @@
+import * as fs from "node:fs/promises";
 import {
 	computeBoardResponseHash,
 	computeStationMasterHash,
@@ -7,7 +8,7 @@ import { fetchDepartureBoards } from "./boards";
 import type { CommitSnapshotResult } from "./commit";
 import { commitCaptureSnapshot } from "./commit";
 import { type CaptureOptions, resolveCaptureContext } from "./context";
-import { evaluateGate1, evaluateGate2 } from "./gates";
+import { evaluateGate1, evaluateGate2, promoteSnapshotToDisk } from "./gates";
 import { writeSnapshotToDisk } from "./persist";
 import { filterOperationalStations } from "./stations";
 import { printCaptureSummary } from "./summary";
@@ -15,6 +16,11 @@ import type { CaptureResult } from "./types";
 
 /**
  * Executes the full live capture pipeline (§8.1, §8.2).
+ *
+ * Data-safety contract: the fetched network payload is always persisted
+ * to disk before Gate 2 evaluates the board hash. Gate 2 returns a
+ * verdict — "accept", "bump", or "quit" — and the orchestrator acts on
+ * it without ever discarding the data written to disk.
  */
 export async function executeCapture(
 	options: CaptureOptions = {},
@@ -75,7 +81,27 @@ export async function executeCapture(
 		boardsResult.boardsMap,
 	);
 
-	// 4. Gate 2: Timetable Edition Gate
+	// 4. Write snapshot to disk immediately as "provisional".
+	//    This guarantees the fetched data survives Gate 2 regardless of outcome.
+	const provisionalStatus = boardsResult.isDegraded
+		? "degraded"
+		: "provisional";
+	const provisionalResult = await writeSnapshotToDisk({
+		dataDir: ctx.dataDir,
+		versionToUse: gate1.versionToUse,
+		shouldBumpVersion: gate1.shouldBumpVersion,
+		snapshotDate: ctx.snapshotDate,
+		resolvedDayType: ctx.resolvedDayType,
+		regionScope: ctx.regionScope,
+		currentStationMasterHash,
+		currentBoardResponseHash,
+		isDegraded: boardsResult.isDegraded,
+		stationsResponse,
+		rawBoardsMap: boardsResult.rawBoardsMap,
+		status: provisionalStatus,
+	});
+
+	// 5. Gate 2: Timetable Edition Gate — operates on-disk, returns a verdict
 	const gate2 = await evaluateGate2({
 		dataDir: ctx.dataDir,
 		versionToUse: gate1.versionToUse,
@@ -90,28 +116,99 @@ export async function executeCapture(
 	ctx.logger.info(
 		"capture",
 		"gate2_evaluated",
-		`Gate 2 evaluated: version ${gate2.versionToUse}`,
+		`Gate 2 evaluated: verdict=${gate2.verdict}, version ${gate2.versionToUse}`,
 		{
+			verdict: gate2.verdict,
 			versionToUse: gate2.versionToUse,
 			shouldBumpVersion: gate2.shouldBumpVersion,
 			boardResponseHash: currentBoardResponseHash,
 		},
 	);
 
-	// 5. Atomic Disk Persistence
-	const result = await writeSnapshotToDisk({
-		dataDir: ctx.dataDir,
-		versionToUse: gate2.versionToUse,
-		shouldBumpVersion: gate2.shouldBumpVersion,
-		snapshotDate: ctx.snapshotDate,
-		resolvedDayType: ctx.resolvedDayType,
-		regionScope: ctx.regionScope,
-		currentStationMasterHash,
-		currentBoardResponseHash,
-		isDegraded: boardsResult.isDegraded,
-		stationsResponse,
-		rawBoardsMap: boardsResult.rawBoardsMap,
-	});
+	let result: CaptureResult;
+
+	if (gate2.verdict === "quit") {
+		// Operator deferred — leave snapshot as provisional, exit cleanly
+		result = {
+			...provisionalResult,
+			commitResult: undefined,
+			logFilePath: ctx.logFilePath,
+		};
+
+		printCaptureSummary({
+			result: { ...provisionalResult, logFilePath: ctx.logFilePath },
+			totalStations: operationalStations.length,
+			successfulBoardsCount: boardsResult.boardsMap.size,
+			failedStations: boardsResult.failedStations,
+			durationSecs: timer.elapsedSecs,
+		});
+
+		ctx.logger.info(
+			"capture",
+			"capture_provisional",
+			"Capture left as provisional by operator. Inspect with: krl diff",
+			{
+				timetableVersion: provisionalResult.timetable_version,
+				snapshotId: provisionalResult.snapshot_id,
+				snapshotDir: provisionalResult.snapshot_dir,
+			},
+		);
+
+		await ctx.logger.flush();
+		return result;
+	}
+
+	if (gate2.verdict === "bump") {
+		// Operator confirmed version bump — write a fresh complete snapshot under
+		// the new version, then delete the provisional from the original version.
+		const bumpedResult = await writeSnapshotToDisk({
+			dataDir: ctx.dataDir,
+			versionToUse: gate2.versionToUse,
+			shouldBumpVersion: true,
+			snapshotDate: ctx.snapshotDate,
+			resolvedDayType: ctx.resolvedDayType,
+			regionScope: ctx.regionScope,
+			currentStationMasterHash,
+			currentBoardResponseHash,
+			isDegraded: boardsResult.isDegraded,
+			stationsResponse,
+			rawBoardsMap: boardsResult.rawBoardsMap,
+			// No status override — use default complete/degraded logic
+		});
+
+		// Clean up the now-redundant provisional from the previous version
+		await fs.rm(provisionalResult.snapshot_dir, {
+			recursive: true,
+			force: true,
+		});
+
+		result = {
+			...bumpedResult,
+			commitResult: undefined,
+			logFilePath: ctx.logFilePath,
+		};
+	} else {
+		// verdict === "accept": hash matched or operator accepted divergence.
+		// Promote the provisional manifest to "complete" in-place.
+		if (!boardsResult.isDegraded) {
+			await promoteSnapshotToDisk({
+				dataDir: ctx.dataDir,
+				version: provisionalResult.timetable_version,
+				snapshotId: provisionalResult.snapshot_id,
+				manifest: provisionalResult.manifest,
+			});
+		}
+
+		result = {
+			...provisionalResult,
+			manifest: {
+				...provisionalResult.manifest,
+				status: boardsResult.isDegraded ? "degraded" : "complete",
+			},
+			commitResult: undefined,
+			logFilePath: ctx.logFilePath,
+		};
+	}
 
 	// 6. Report Summary
 	printCaptureSummary({

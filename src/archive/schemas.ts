@@ -46,6 +46,6 @@ export const CaptureManifestSchema = z.object({
 	fetched_at: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, {
 		error: "Expected ISO-8601 UTC timestamp",
 	}),
-	status: z.enum(["complete", "degraded"]),
+	status: z.enum(["complete", "degraded", "provisional"]),
 });
 export type CaptureManifest = z.infer<typeof CaptureManifestSchema>;
