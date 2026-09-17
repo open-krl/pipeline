@@ -66,7 +66,11 @@ export function resolveStationId(
 	// 2. Check with known spelling variants (e.g. PRIUK <-> PRIOK for Tanjung Priok)
 	const transliteratedToken = normalizedToken.replace(/PRIUK/g, "PRIOK");
 	const byTransliteration = stationsCatalog.find(
-		(s) => s.sta_name.replace(/\s+/g, "").toUpperCase() === transliteratedToken,
+		(s) =>
+			s.sta_name
+				.replace(/\s+/g, "")
+				.toUpperCase()
+				.replace(/PRIUK/g, "PRIOK") === transliteratedToken,
 	);
 	if (byTransliteration) {
 		return byTransliteration.sta_id;

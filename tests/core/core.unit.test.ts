@@ -173,6 +173,9 @@ describe("src/core/route", () => {
 		expect(resolveStationId("CIKARANG VIA MRI", stations)).toBe("CKR");
 		expect(resolveStationId("KAMPUNGBANDAN VIA PSE", stations)).toBe("KPB");
 		expect(resolveStationId("TANJUNGPRIUK", stations)).toBe("TPK");
+
+		const altStations = [{ sta_id: "TPK", sta_name: "TANJUNG PRIUK" }];
+		expect(resolveStationId("TANJUNG PRIOK", altStations)).toBe("TPK");
 	});
 });
 
