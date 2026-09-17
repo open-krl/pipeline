@@ -5,3 +5,4 @@ db/*.db-shm
 exports/
 data/.vite/
 logs/
+scratch/
