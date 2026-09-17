@@ -14,6 +14,7 @@ import {
 import { formatCensusCommitMessage } from "../../src/census/census";
 import {
 	commitPath,
+	getGitCommitForPath,
 	getGitCommitHash,
 	isGitRepository,
 } from "../../src/core/git";
@@ -272,6 +273,28 @@ describe("src/core/git", () => {
 			});
 			expect(secondResult.committed).toBe(false);
 			expect(secondResult.reason).toContain("No uncommitted changes");
+		});
+
+		it("getGitCommitForPath resolves latest commit hash for a specific path", async () => {
+			const targetFile = path.join(tempDir, "data/file.txt");
+			await fs.mkdir(path.dirname(targetFile), { recursive: true });
+			await fs.writeFile(targetFile, "content v1");
+
+			await execFileAsync("git", ["add", "data/file.txt"], { cwd: tempDir });
+			await execFileAsync("git", ["commit", "-m", "chore: add file"], {
+				cwd: tempDir,
+			});
+
+			const commitHash = await getGitCommitForPath("data/file.txt", tempDir);
+			expect(commitHash).toBeDefined();
+			expect(typeof commitHash).toBe("string");
+			expect(commitHash).toHaveLength(40);
+
+			const nonExistent = await getGitCommitForPath(
+				"non/existent/path.txt",
+				tempDir,
+			);
+			expect(nonExistent).toBeNull();
 		});
 	});
 });

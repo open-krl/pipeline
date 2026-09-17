@@ -67,7 +67,15 @@ export async function getGitCommitForPath(
 	try {
 		const { stdout } = await execFileAsync(
 			"git",
-			["log", "-n", "1", "--format=%H", "--", targetPath],
+			[
+				"--literal-pathspecs",
+				"log",
+				"-n",
+				"1",
+				"--format=%H",
+				"--",
+				targetPath,
+			],
 			{ cwd },
 		);
 		const hash = stdout.trim();
