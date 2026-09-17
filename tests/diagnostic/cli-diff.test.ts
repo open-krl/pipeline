@@ -84,6 +84,25 @@ describe("CLI Diff Tool — executeDiff integration", () => {
 		);
 	});
 
+	it("runs diff between snapshots with --git without errors", async () => {
+		let output = "";
+		const originalLog = console.log;
+		console.log = (msg?: unknown) => {
+			output += `${String(msg)}\n`;
+		};
+
+		try {
+			await executeDiff(["1:1", "1:3"], {
+				dataDir: "data/raw",
+				git: true,
+			});
+		} finally {
+			console.log = originalLog;
+		}
+
+		expect(output).toContain("--- Raw Git Diff (no-index) ---");
+	});
+
 	it("throws when invalid day type is provided for itinerary diff", async () => {
 		await expect(
 			executeDiff([], {

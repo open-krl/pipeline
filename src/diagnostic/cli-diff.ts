@@ -1,10 +1,10 @@
-// src/diagnostic/cli-diff.ts
-
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import {
 	getItineraryPath,
 	readItineraryEnvelope,
 } from "../archive/itineraries";
-import { itinerariesDir } from "../archive/layout";
+import { itinerariesDir, snapshotDir } from "../archive/layout";
 import { DayTypeSchema } from "../archive/schemas";
 import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
 import { resolveSafePath } from "../core/path";
@@ -16,6 +16,8 @@ import {
 import { diffItineraries } from "./itinerary";
 import { diffSnapshots, type SnapshotRef } from "./snapshot";
 
+const execFileAsync = promisify(execFile);
+
 export interface DiffCommandOptions {
 	dataDir?: string;
 	v1?: number | string;
@@ -23,6 +25,7 @@ export interface DiffCommandOptions {
 	train?: string | string[];
 	dayType?: string;
 	detail?: boolean;
+	git?: boolean;
 }
 
 /**
@@ -317,4 +320,49 @@ export async function executeDiff(
 	console.log(
 		`=============================================================\n`,
 	);
+
+	if (options.git) {
+		const beforeDir = snapshotDir(
+			dataDir,
+			result.snapshotBefore.version,
+			result.snapshotBefore.snapshotId,
+		);
+		const afterDir = snapshotDir(
+			dataDir,
+			result.snapshotAfter.version,
+			result.snapshotAfter.snapshotId,
+		);
+
+		console.log(`--- Raw Git Diff (no-index) ---`);
+		try {
+			const { stdout, stderr } = await execFileAsync("git", [
+				"diff",
+				"--no-index",
+				"--color=always",
+				beforeDir,
+				afterDir,
+			]);
+			if (stdout) {
+				console.log(stdout);
+			} else {
+				console.log("No differences detected across snapshot directories.");
+			}
+			if (stderr) {
+				console.error(stderr);
+			}
+		} catch (err: unknown) {
+			// git diff --no-index exits with code 1 when differences are found
+			const execErr = err as { stdout?: string; stderr?: string };
+			if (execErr.stdout) {
+				console.log(execErr.stdout);
+			} else {
+				console.error(
+					`Failed to run git diff: ${err instanceof Error ? err.message : String(err)}`,
+				);
+			}
+			if (execErr.stderr) {
+				console.error(execErr.stderr);
+			}
+		}
+	}
 }

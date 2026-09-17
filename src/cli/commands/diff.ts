@@ -9,6 +9,7 @@ interface DiffOptions {
 	train?: string | string[];
 	dayType?: string;
 	detail?: boolean;
+	git?: boolean;
 }
 
 /** cac passes positional args + options object as variadic action args. */
@@ -49,6 +50,10 @@ export function registerDiffCommand(cli: CAC): void {
 		.option(
 			"--detail",
 			"Display full station-by-station and stop-by-stop listings",
+		)
+		.option(
+			"--git",
+			"Display raw git diff across snapshot directories (or boards)",
 		)
 		.action(async (...actionArgs: unknown[]) => {
 			const { args, options } = extractArgs(actionArgs);
