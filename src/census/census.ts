@@ -1,15 +1,11 @@
 // src/census/census.ts
-import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { KciClient } from "../api/client";
-import {
-	type DayType,
-	DepartureBoardResponseSchema,
-	type ItineraryObservation,
-	type ItineraryStop,
-	type MultiObservationItinerary,
-	MultiObservationItinerarySchema,
+import type {
+	DayType,
+	ItineraryObservation,
+	ItineraryStop,
 } from "../api/schemas";
 import { scanSnapshots, scanTimetableVersions } from "../capture";
 import { payloadHash } from "../core/canonical";
@@ -20,15 +16,20 @@ import {
 	startTimer,
 } from "../core/logger";
 import { resolveSafePath } from "../core/path";
+import { type DiscoveredTrain, discoverTrainIds } from "./discovery";
+import {
+	getItineraryPath,
+	readItineraryEnvelope,
+	writeItineraryEnvelope,
+} from "./envelope";
+import {
+	runStratifiedSpotCheck,
+	type StratifiedCheckResult,
+	type StratifiedDivergence,
+	selectStratifiedSample,
+} from "./sample";
 
-export interface DiscoveredTrain {
-	trainId: string;
-	kaName?: string;
-	routeName?: string;
-	dest?: string;
-	stations: string[];
-	dayTypes: Set<DayType>;
-}
+export type { DiscoveredTrain, StratifiedCheckResult, StratifiedDivergence };
 
 export interface CensusOptions {
 	client?: KciClient;
@@ -54,20 +55,6 @@ export interface CensusProgress {
 	error?: string;
 }
 
-export interface StratifiedDivergence {
-	stratum: string;
-	trainId: string;
-	baselineDayType: DayType;
-	baselineHash: string;
-	liveHash: string;
-}
-
-export interface StratifiedCheckResult {
-	evaluated: boolean;
-	divergences: StratifiedDivergence[];
-	passed: boolean;
-}
-
 export interface CensusResult {
 	version: number;
 	dayType: DayType;
@@ -82,309 +69,6 @@ export interface CensusResult {
 	failedTrains: Array<{ trainId: string; reason: string }>;
 	commitResult?: CommitCensusResult;
 	logFilePath?: string;
-}
-
-/**
- * Scans all board files within captures of a given timetable version,
- * discovering all distinct train IDs and their routing metadata (§8.1, §8.3).
- */
-export async function discoverTrainIds(
-	dataDir: string,
-	version: number,
-	filterDayType?: DayType,
-): Promise<Map<string, DiscoveredTrain>> {
-	const safeDataDir = resolveSafePath(dataDir);
-	const snapshots = await scanSnapshots(safeDataDir, version);
-	const trains = new Map<string, DiscoveredTrain>();
-
-	const matchingSnapshots = filterDayType
-		? snapshots.filter((s) => s.manifest.day_type === filterDayType)
-		: snapshots;
-
-	for (const snap of matchingSnapshots) {
-		const boardsDir = resolveSafePath(
-			path.join(
-				safeDataDir,
-				String(version),
-				"captures",
-				String(snap.id),
-				"boards",
-			),
-			safeDataDir,
-		);
-
-		let entries: Dirent[];
-		try {
-			entries = await fs.readdir(boardsDir, { withFileTypes: true });
-		} catch {
-			continue;
-		}
-
-		for (const entry of entries) {
-			if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
-			const boardFile = resolveSafePath(
-				path.join(boardsDir, entry.name),
-				boardsDir,
-			);
-			const staId = entry.name.replace(/\.json$/, "");
-
-			try {
-				const content = await fs.readFile(boardFile, "utf-8");
-				const parsed = DepartureBoardResponseSchema.parse(JSON.parse(content));
-
-				for (const item of parsed.data) {
-					if (
-						!item.train_id ||
-						typeof item.train_id !== "string" ||
-						item.train_id.includes("..") ||
-						!/^[A-Za-z0-9_/-]+$/.test(item.train_id)
-					) {
-						console.warn(
-							`Warning: Skipping invalid train ID '${item.train_id}' in board ${boardFile}`,
-						);
-						continue;
-					}
-
-					const existing = trains.get(item.train_id);
-					if (existing) {
-						if (!existing.stations.includes(staId)) {
-							existing.stations.push(staId);
-						}
-						existing.dayTypes.add(snap.manifest.day_type);
-						if (!existing.kaName && item.ka_name) {
-							existing.kaName = item.ka_name;
-						}
-						if (!existing.routeName && item.route_name) {
-							existing.routeName = item.route_name;
-						}
-						if (!existing.dest && item.dest) {
-							existing.dest = item.dest;
-						}
-					} else {
-						trains.set(item.train_id, {
-							trainId: item.train_id,
-							kaName: item.ka_name,
-							routeName: item.route_name,
-							dest: item.dest,
-							stations: [staId],
-							dayTypes: new Set([snap.manifest.day_type]),
-						});
-					}
-				}
-			} catch (err) {
-				console.warn(
-					`Warning: Failed to parse board file at ${boardFile}:`,
-					err instanceof Error ? err.message : String(err),
-				);
-			}
-		}
-	}
-
-	return trains;
-}
-
-/**
- * Samples 5 representative services across key corridors for the Stratified Spot-Check (§9):
- * 1. Bogor Trunk train
- * 2. Cikarang Trunk train
- * 3. Loop-line / Racket topology train
- * 4. Western Branch line train (Rangkasbitung / Merak)
- * 5. Fakultatif ('F'-suffix) train
- */
-export function selectStratifiedSample(
-	discoveredTrains: Map<string, DiscoveredTrain>,
-): Record<string, DiscoveredTrain | null> {
-	const sample: Record<string, DiscoveredTrain | null> = {
-		bogor: null,
-		cikarang: null,
-		loop: null,
-		branch: null,
-		fakultatif: null,
-	};
-
-	for (const train of discoveredTrains.values()) {
-		const trainId = train.trainId;
-		const kaName = (train.kaName ?? "").toLowerCase();
-		const routeName = (train.routeName ?? "").toLowerCase();
-		const dest = (train.dest ?? "").toUpperCase();
-
-		// 5. Fakultatif service (ends in 'F', e.g. 1234F)
-		if (!sample.fakultatif && /f$/i.test(trainId)) {
-			sample.fakultatif = train;
-		}
-
-		// 1. Bogor Trunk (calls at Bogor / Manggarai trunk, ka_name mentions Bogor)
-		if (
-			!sample.bogor &&
-			(kaName.includes("bogor") ||
-				dest === "BOGOR" ||
-				dest === "JAKARTA KOTA") &&
-			(train.stations.includes("BOO") || train.stations.includes("MRI"))
-		) {
-			sample.bogor = train;
-		}
-
-		// 2. Cikarang Trunk (calls at Bekasi/Cikarang trunk, ka_name mentions Cikarang)
-		if (
-			!sample.cikarang &&
-			(kaName.includes("cikarang") ||
-				dest === "CIKARANG" ||
-				dest === "BEKASI") &&
-			(train.stations.includes("CKR") || train.stations.includes("BKS"))
-		) {
-			sample.cikarang = train;
-		}
-
-		// 3. Loop-line / Racket (calls at loop stations e.g. Kampung Bandan, Angke, Jatinegara)
-		if (
-			!sample.loop &&
-			(kaName.includes("loop") ||
-				routeName.includes("loop") ||
-				routeName.includes("lingkar") ||
-				(train.stations.includes("KMO") && train.stations.includes("JNG")))
-		) {
-			sample.loop = train;
-		}
-
-		// 4. Western Branch (Rangkasbitung, Serpong, Merak)
-		if (
-			!sample.branch &&
-			(kaName.includes("rangkasbitung") ||
-				kaName.includes("merak") ||
-				dest === "RANGKASBITUNG" ||
-				dest === "MERAK" ||
-				train.stations.includes("RK") ||
-				train.stations.includes("MER"))
-		) {
-			sample.branch = train;
-		}
-	}
-
-	return sample;
-}
-
-/**
- * Safely resolves the JSON envelope storage path for a train ID.
- * Replaces forward slashes with '%2F' to ensure flat directory storage,
- * and guarantees containment within itinerariesDir.
- */
-export function getItineraryPath(
-	itinerariesDir: string,
-	trainId: string,
-): string {
-	const safeFilename = `${encodeURIComponent(trainId)}.json`;
-	return resolveSafePath(
-		path.join(itinerariesDir, safeFilename),
-		itinerariesDir,
-	);
-}
-
-/**
- * Reads and parses an existing MultiObservationItinerary envelope from disk.
- * Returns null if the file does not exist (ENOENT). Throws if corrupted or malformed.
- */
-export async function readItineraryEnvelope(
-	filePath: string,
-): Promise<MultiObservationItinerary | null> {
-	try {
-		const content = await fs.readFile(filePath, "utf-8");
-		return MultiObservationItinerarySchema.parse(JSON.parse(content));
-	} catch (err) {
-		if (
-			err &&
-			typeof err === "object" &&
-			"code" in err &&
-			(err as { code: string }).code === "ENOENT"
-		) {
-			return null;
-		}
-		throw new Error(
-			`Failed to read or parse itinerary envelope at ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
-		);
-	}
-}
-
-/**
- * Atomically writes a MultiObservationItinerary envelope to disk via temporary sibling rename.
- */
-export async function writeItineraryEnvelope(
-	filePath: string,
-	envelope: MultiObservationItinerary,
-): Promise<void> {
-	MultiObservationItinerarySchema.parse(envelope);
-	const dir = path.dirname(filePath);
-	const filename = path.basename(filePath);
-	const tmpFile = resolveSafePath(
-		path.join(dir, `.tmp_${filename}_${Date.now()}`),
-		dir,
-	);
-
-	await fs.writeFile(tmpFile, JSON.stringify(envelope, null, 2), "utf-8");
-	await fs.rename(tmpFile, filePath);
-}
-
-/**
- * Runs the Stratified Spot-Check (§9) against 5 representative services.
- * Compares current live payload hashes against cached baseline (weekday) observations.
- */
-export async function runStratifiedSpotCheck(params: {
-	client: KciClient;
-	itinerariesDir: string;
-	sample: Record<string, DiscoveredTrain | null>;
-	currentDayType: DayType;
-	baselineDayType?: DayType;
-}): Promise<StratifiedCheckResult> {
-	const baselineDayType = params.baselineDayType ?? "weekday";
-	const divergences: StratifiedDivergence[] = [];
-	let checkedAny = false;
-
-	for (const [stratum, train] of Object.entries(params.sample)) {
-		if (!train) continue;
-
-		const itineraryFile = getItineraryPath(
-			params.itinerariesDir,
-			train.trainId,
-		);
-		const existing = await readItineraryEnvelope(itineraryFile);
-		const baselineObs = existing?.observations[baselineDayType];
-		if (!baselineObs) continue;
-
-		checkedAny = true;
-		const liveResponse = await params.client.fetchTrainSchedule(train.trainId);
-
-		// Upstream 404 handling
-		if (!liveResponse) {
-			// Fakultatif ('F'-suffix) trains on weekends: 404 is expected suspension, not divergence (§9)
-			if (stratum === "fakultatif") {
-				continue;
-			}
-			divergences.push({
-				stratum,
-				trainId: train.trainId,
-				baselineDayType,
-				baselineHash: baselineObs.payload_hash,
-				liveHash: "404_NOT_FOUND",
-			});
-			continue;
-		}
-
-		const liveHash = payloadHash(liveResponse.data);
-		if (liveHash !== baselineObs.payload_hash) {
-			divergences.push({
-				stratum,
-				trainId: train.trainId,
-				baselineDayType,
-				baselineHash: baselineObs.payload_hash,
-				liveHash,
-			});
-		}
-	}
-
-	return {
-		evaluated: checkedAny,
-		divergences,
-		passed: divergences.length === 0,
-	};
 }
 
 /**
