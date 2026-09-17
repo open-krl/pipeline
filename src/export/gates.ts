@@ -48,7 +48,16 @@ export function evaluateReleaseGates(
 	}
 
 	// Gate 3: --require-holiday-coverage
-	if (input.holidayDates.length > 0) {
+	if (input.holidayDates.length === 0) {
+		if (input.requireHolidayCoverage) {
+			throw new Error(
+				"Release Gate Failed (--require-holiday-coverage): Database contains zero statutory holiday dates. Cannot verify holiday coverage.",
+			);
+		}
+		warnings.push(
+			"Notice: Database contains zero statutory holiday dates. Fakultatif exceptions cannot be modeled.",
+		);
+	} else {
 		const sortedHolidays = [...input.holidayDates].sort();
 		const latestHolidayYmd = sortedHolidays[sortedHolidays.length - 1];
 		const latestHolidayGtfs = latestHolidayYmd.replaceAll("-", "");

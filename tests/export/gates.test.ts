@@ -101,5 +101,30 @@ describe("src/export/gates — Release Gates", () => {
 		expect(withWarning.warnings[0]).toContain(
 			"exceeds covered statutory holiday decrees",
 		);
+
+		// Empty holiday dates with gate enabled -> throws
+		expect(() =>
+			evaluateReleaseGates({
+				calendarStates: [],
+				itineraryStatuses: [],
+				holidayDates: [],
+				endDate: "20261231",
+				requireHolidayCoverage: true,
+			}),
+		).toThrow("Database contains zero statutory holiday dates");
+
+		// Empty holiday dates without gate enabled -> emits warning
+		const emptyWarning = evaluateReleaseGates({
+			calendarStates: [],
+			itineraryStatuses: [],
+			holidayDates: [],
+			endDate: "20261231",
+			requireHolidayCoverage: false,
+		});
+		expect(emptyWarning.valid).toBe(true);
+		expect(emptyWarning.warnings).toHaveLength(1);
+		expect(emptyWarning.warnings[0]).toContain(
+			"Database contains zero statutory holiday dates",
+		);
 	});
 });
