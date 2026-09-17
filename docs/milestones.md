@@ -119,7 +119,7 @@ flowchart LR
 ---
 
 ### Milestone 6: Semantic Diffing & Operational Diagnostics 🟡 (Next Up)
-- [ ] **Task 6.1: Core Semantic Diff Engine (`src/diagnostic/diff.ts`)**
+- [x] **Task 6.1: Core Semantic Diff Engine (`src/diagnostic/`)**
   - Pure functional diffing across 3 raw artifacts: station catalog (`stations.json`), departure boards (`boards/*.json`), and itinerary envelopes (`itineraries/*.json`).
   - Fingerprint-based trip matching ($\text{base\_train\_no}$, origin, dest, arrival $\pm$ tolerance) distinguishing re-lettering (`5022D → 5022E`), retimed departures ($\pm\Delta$ mins), and added/withdrawn trips.
   - Stop-level itinerary diffing (sequence changes, added/removed stops, dwell & transit $\pm\Delta$ seconds).
