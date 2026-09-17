@@ -47,6 +47,11 @@ export function createCli() {
 			"--commit",
 			"Automatically commit captured snapshot to git (use --no-commit to skip)",
 		)
+		.option(
+			"--log-file <path>",
+			"Custom destination path for structured JSONL logs",
+		)
+		.option("--no-log", "Disable automatic file logging under logs/")
 		.action(
 			async (options: {
 				dayType?: string;
@@ -55,6 +60,8 @@ export function createCli() {
 				yes?: boolean;
 				dataDir?: string;
 				commit?: boolean;
+				logFile?: string;
+				log?: boolean;
 			}) => {
 				let dayType: DayType | undefined;
 				if (options.dayType) {
@@ -106,6 +113,8 @@ export function createCli() {
 					dataDir,
 					commit,
 					noCommit,
+					logFilePath: options.logFile,
+					noLog: options.log === false,
 				});
 
 				console.log(
@@ -272,6 +281,11 @@ export function createCli() {
 		)
 		.option("--data-dir <path>", "Override raw data root directory")
 		.option("--commit", "Automatically commit captured itineraries to git")
+		.option(
+			"--log-file <path>",
+			"Custom destination path for structured JSONL logs",
+		)
+		.option("--no-log", "Disable automatic file logging under logs/")
 		.action(
 			async (
 				versionArg: string | undefined,
@@ -281,6 +295,8 @@ export function createCli() {
 					timetableVersion?: string | number;
 					dataDir?: string;
 					commit?: boolean;
+					logFile?: string;
+					log?: boolean;
 				},
 			) => {
 				let dayType: DayType | undefined;
@@ -330,7 +346,13 @@ export function createCli() {
 						version,
 						dataDir,
 						commit: Boolean(options.commit),
+						logFilePath: options.logFile,
+						noLog: options.log === false,
 					});
+
+					const logStr = result.logFilePath
+						? `\nLog File:           ${result.logFilePath}`
+						: "";
 
 					console.log(`
 ── Census Summary ───────────────────────────────────────────
@@ -340,7 +362,7 @@ Total Discovered:   ${result.totalDiscovered} trains
 Newly Probed:       ${result.totalProbed} (${result.successCount} OK, ${result.notFoundCount} 404/suspended)
 Already Cached:     ${result.cachedCount} trains
 Failed / Errors:    ${result.failedCount} trains
-Duration:           ${result.durationSecs}s
+Duration:           ${result.durationSecs}s${logStr}
 ─────────────────────────────────────────────────────────────
 `);
 					if (result.commitResult) {
