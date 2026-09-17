@@ -6,9 +6,9 @@ import {
 	scanSnapshots,
 	scanTimetableVersions,
 } from "../archive/snapshots";
+import type { PromptFn } from "../core/prompt";
 import { diffDepartureBoards } from "../diagnostic/board";
 import { diffStationCatalogs } from "../diagnostic/catalog";
-import type { PromptFn } from "./prompt";
 
 export interface Gate1Params {
 	dataDir: string;

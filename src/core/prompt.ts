@@ -1,3 +1,4 @@
+// src/core/prompt.ts
 import * as readline from "node:readline/promises";
 
 export type PromptFn = (
@@ -6,10 +7,11 @@ export type PromptFn = (
 ) => Promise<boolean>;
 
 /**
- * Standard CLI prompt helper using node:readline.
- * Non-TTY contexts fall back to the default answer.
+ * Interactive yes/no confirmation. Empty input accepts the default.
+ * Non-TTY contexts (piped stdin, CI without a terminal) return the
+ * default answer instead of hanging on stdin.
  */
-export const defaultPrompt: PromptFn = async (question, defaultYes = false) => {
+export const confirm: PromptFn = async (question, defaultYes = false) => {
 	if (!process.stdin.isTTY) {
 		return defaultYes;
 	}

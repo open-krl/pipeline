@@ -4,8 +4,8 @@ import { DEFAULT_REGION_SCOPE, type RegionScope } from "../config";
 import { formatDateWib, resolveDayType } from "../core/calendar";
 import { generateDefaultLogPath, StructuredLogger } from "../core/logger";
 import { resolveSafePath } from "../core/path";
+import { confirm as defaultPrompt, type PromptFn } from "../core/prompt";
 import { loadHolidays } from "../db/holidays";
-import { defaultPrompt, type PromptFn } from "./prompt";
 
 export interface CaptureOptions {
 	client?: KciClient;

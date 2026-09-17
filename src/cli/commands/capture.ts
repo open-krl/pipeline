@@ -1,7 +1,7 @@
 import type { CAC } from "cac";
 import { commitCaptureSnapshot, executeCapture } from "../../capture/capture";
+import { confirm } from "../../core/prompt";
 import { parseDataDir, parseDayType, parseRegion } from "../shared/parse";
-import { confirm } from "../shared/prompt";
 
 interface CaptureOptions {
 	dayType?: string;
