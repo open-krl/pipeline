@@ -5,6 +5,7 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { strFromU8, unzipSync } from "fflate";
+import { executeBuild } from "../../src/build/build";
 import { executeExport, normalizeDateToGtfs } from "../../src/export/export";
 
 describe("Stage 4 GTFS Export Integration Suite", () => {
@@ -28,6 +29,11 @@ describe("Stage 4 GTFS Export Integration Suite", () => {
 
 	beforeAll(async () => {
 		await fs.mkdir(testOutDir, { recursive: true });
+		try {
+			await fs.access(dbPath);
+		} catch {
+			await executeBuild({ version: 1, dbPath });
+		}
 	});
 
 	afterAll(async () => {
@@ -141,7 +147,7 @@ describe("Stage 4 GTFS Export Integration Suite", () => {
 	});
 
 	it("release gate: halts on --require-resolved-calendar when calendar is provisional", async () => {
-		expect(
+		await expect(
 			executeExport({
 				dbPath,
 				outDir: testOutDir,
