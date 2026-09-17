@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import * as path from "node:path";
 import { promisify } from "node:util";
 import { snapshotDir } from "../archive/layout";
-import { type CaptureManifest } from "../archive/schemas";
+import type { CaptureManifest } from "../archive/schemas";
 import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
 import { resolveSafePath } from "../core/path";
 

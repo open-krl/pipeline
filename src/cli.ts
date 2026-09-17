@@ -4,15 +4,10 @@ import * as path from "node:path";
 import * as readline from "node:readline/promises";
 import { cac } from "cac";
 import { type DayType, DayTypeSchema } from "./archive/schemas";
-import {
-	commitCaptureSnapshot,
-	executeCapture,
-	formatSnapshotTable,
-	getSnapshotList,
-	scanSnapshots,
-	scanTimetableVersions,
-} from "./capture";
-import { executeCensus } from "./census";
+import { scanSnapshots, scanTimetableVersions } from "./archive/snapshots";
+import { commitCaptureSnapshot, executeCapture } from "./capture/capture";
+import { formatSnapshotTable, getSnapshotList } from "./capture/snapshots";
+import { executeCensus } from "./census/census";
 import { type RegionScope, RegionScopeSchema } from "./config";
 import { resolveSafePath } from "./core/path";
 

@@ -4,7 +4,10 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { CaptureManifest } from "../../src/archive/schemas";
-import { formatSnapshotTable, getSnapshotList } from "../../src/capture";
+import {
+	formatSnapshotTable,
+	getSnapshotList,
+} from "../../src/capture/snapshots";
 
 const TEST_DATA_DIR = path.resolve(
 	process.cwd(),

@@ -1,6 +1,5 @@
 // src/census/census.ts
 import * as fs from "node:fs/promises";
-import * as path from "node:path";
 import { KciClient } from "../api/client";
 import type { ItineraryStop } from "../api/schemas";
 import { itinerariesDir as getItinerariesDir } from "../archive/layout";

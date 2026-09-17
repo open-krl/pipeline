@@ -4,16 +4,20 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { type FetchFunction, KciClient } from "../../src/api/client";
 import type { DepartureBoardResponse } from "../../src/api/schemas";
+import {
+	readItineraryEnvelope,
+	writeItineraryEnvelope,
+} from "../../src/archive/itineraries";
 import type { CaptureManifest } from "../../src/archive/schemas";
+import { executeCensus } from "../../src/census/census";
 import {
 	type DiscoveredTrain,
 	discoverTrainIds,
-	executeCensus,
-	readItineraryEnvelope,
+} from "../../src/census/discovery";
+import {
 	runStratifiedSpotCheck,
 	selectStratifiedSample,
-	writeItineraryEnvelope,
-} from "../../src/census";
+} from "../../src/census/sample";
 import { payloadHash } from "../../src/core/canonical";
 
 const TEST_SCRATCH_DIR = path.resolve(process.cwd(), "scratch/test_census_env");
