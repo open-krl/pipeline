@@ -41,13 +41,29 @@ import {
 import type { ExportOptions, ExportResult, ExportStats } from "./types";
 import { createGtfsZip, writeGtfsZip } from "./zip";
 
-function normalizeDateToGtfs(dateStr: string): string {
+export function normalizeDateToGtfs(dateStr: string): string {
 	const cleaned = dateStr.replaceAll("-", "").trim();
 	if (!/^\d{8}$/.test(cleaned)) {
 		throw new Error(
 			`Invalid date format '${dateStr}', expected YYYY-MM-DD or YYYYMMDD`,
 		);
 	}
+
+	const y = Number.parseInt(cleaned.slice(0, 4), 10);
+	const m = Number.parseInt(cleaned.slice(4, 6), 10);
+	const d = Number.parseInt(cleaned.slice(6, 8), 10);
+
+	const parsed = new Date(Date.UTC(y, m - 1, d));
+	if (
+		parsed.getUTCFullYear() !== y ||
+		parsed.getUTCMonth() !== m - 1 ||
+		parsed.getUTCDate() !== d
+	) {
+		throw new Error(
+			`Invalid calendar date '${dateStr}' (impossible date components)`,
+		);
+	}
+
 	return cleaned;
 }
 

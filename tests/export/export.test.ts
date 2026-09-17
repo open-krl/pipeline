@@ -5,12 +5,26 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { strFromU8, unzipSync } from "fflate";
-import { executeExport } from "../../src/export/export";
+import { executeExport, normalizeDateToGtfs } from "../../src/export/export";
 
 describe("Stage 4 GTFS Export Integration Suite", () => {
 	const testOutDir = path.join(process.cwd(), "scratch/test_gtfs_export");
 	const testCsvDir = path.join(testOutDir, "csv_dump");
 	const dbPath = path.join(process.cwd(), "data/build/krl_v1.db");
+
+	it("normalizeDateToGtfs: validates real calendar dates and rejects impossible dates", () => {
+		expect(normalizeDateToGtfs("2026-09-16")).toBe("20260916");
+		expect(normalizeDateToGtfs("20261231")).toBe("20261231");
+		expect(() => normalizeDateToGtfs("2026-02-30")).toThrow(
+			"impossible date components",
+		);
+		expect(() => normalizeDateToGtfs("20261301")).toThrow(
+			"impossible date components",
+		);
+		expect(() => normalizeDateToGtfs("invalid-date")).toThrow(
+			"Invalid date format",
+		);
+	});
 
 	beforeAll(async () => {
 		await fs.mkdir(testOutDir, { recursive: true });
