@@ -2,9 +2,10 @@
 import { execFile } from "node:child_process";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import type { CaptureManifest } from "../api/schemas";
+import { snapshotDir } from "../archive/layout";
+import { type CaptureManifest } from "../archive/schemas";
+import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
 import { resolveSafePath } from "../core/path";
-import { scanSnapshots, scanTimetableVersions } from "./capture";
 
 const execFileAsync = promisify(execFile);
 
@@ -62,16 +63,13 @@ export async function getSnapshotList(
 	for (const version of targetVersions) {
 		const snapshots = await scanSnapshots(dataDir, version);
 		for (const snap of snapshots) {
-			const snapshotDir = resolveSafePath(
-				path.join(dataDir, String(version), "captures", String(snap.id)),
-				dataDir,
-			);
-			const gitCommit = await resolveSnapshotCommit(snapshotDir, cwd);
+			const snapDir = snapshotDir(dataDir, version, snap.id);
+			const gitCommit = await resolveSnapshotCommit(snapDir, cwd);
 			entries.push({
 				version,
 				snapshotId: snap.id,
 				manifest: snap.manifest,
-				snapshotDir,
+				snapshotDir: snapDir,
 				gitCommit,
 			});
 		}

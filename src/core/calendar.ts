@@ -1,6 +1,26 @@
-// src/core/calendar.ts
-import type { DayType, HolidayItem } from "../api/schemas";
+import * as z from "zod";
 import { TIMEZONE } from "../config";
+
+// ─── Operational Day Type Schema (§4.5, §8.2) ────────────────────────────────
+export const DayTypeSchema = z.enum([
+	"weekday",
+	"saturday",
+	"sunday",
+	"holiday",
+]);
+export type DayType = z.infer<typeof DayTypeSchema>;
+
+// ─── Holiday File Schema ─────────────────────────────────────────────────────
+export const HolidayItemSchema = z.object({
+	holiday_date: z
+		.string()
+		.regex(/^\d{4}-\d{2}-\d{2}$/, { error: "Expected YYYY-MM-DD" }),
+	name: z.string().min(1),
+	is_collective_leave: z.boolean(),
+});
+export type HolidayItem = z.infer<typeof HolidayItemSchema>;
+
+export const HolidayFileSchema = z.array(HolidayItemSchema);
 
 /**
  * Formats a given Date instance into 'YYYY-MM-DD' under Asia/Jakarta (WIB) clock.

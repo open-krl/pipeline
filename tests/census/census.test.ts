@@ -3,10 +3,8 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { type FetchFunction, KciClient } from "../../src/api/client";
-import type {
-	CaptureManifest,
-	DepartureBoardResponse,
-} from "../../src/api/schemas";
+import type { DepartureBoardResponse } from "../../src/api/schemas";
+import type { CaptureManifest } from "../../src/archive/schemas";
 import {
 	type DiscoveredTrain,
 	discoverTrainIds,

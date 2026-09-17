@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
 	computeBoardResponseHash,
 	computeStationMasterHash,
-} from "../../src/capture/manifest";
+} from "../../src/archive/hashes";
 import {
 	foldDayTypeRule,
 	formatDateWib,

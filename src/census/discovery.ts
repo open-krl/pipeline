@@ -2,8 +2,10 @@
 import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { type DayType, DepartureBoardResponseSchema } from "../api/schemas";
-import { scanSnapshots } from "../capture";
+import { DepartureBoardResponseSchema } from "../api/schemas";
+import { boardsDir } from "../archive/layout";
+import type { DayType } from "../archive/schemas";
+import { scanSnapshots } from "../archive/snapshots";
 import { resolveSafePath } from "../core/path";
 
 export interface DiscoveredTrain {
@@ -33,30 +35,18 @@ export async function discoverTrainIds(
 		: snapshots;
 
 	for (const snap of matchingSnapshots) {
-		const boardsDir = resolveSafePath(
-			path.join(
-				safeDataDir,
-				String(version),
-				"captures",
-				String(snap.id),
-				"boards",
-			),
-			safeDataDir,
-		);
+		const bDir = boardsDir(safeDataDir, version, snap.id);
 
 		let entries: Dirent[];
 		try {
-			entries = await fs.readdir(boardsDir, { withFileTypes: true });
+			entries = await fs.readdir(bDir, { withFileTypes: true });
 		} catch {
 			continue;
 		}
 
 		for (const entry of entries) {
 			if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
-			const boardFile = resolveSafePath(
-				path.join(boardsDir, entry.name),
-				boardsDir,
-			);
+			const boardFile = resolveSafePath(path.join(bDir, entry.name), bDir);
 			const staId = entry.name.replace(/\.json$/, "");
 
 			try {

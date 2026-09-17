@@ -3,7 +3,7 @@
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
 import { cac } from "cac";
-import { type DayType, DayTypeSchema } from "./api/schemas";
+import { type DayType, DayTypeSchema } from "./archive/schemas";
 import {
 	commitCaptureSnapshot,
 	executeCapture,

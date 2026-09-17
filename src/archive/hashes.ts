@@ -1,4 +1,4 @@
-// src/capture/manifest.ts
+// src/archive/hashes.ts
 import type { DepartureBoardItem, StationItem } from "../api/schemas";
 import { canonicalSerialize, payloadHash, sha256 } from "../core/canonical";
 

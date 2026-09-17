@@ -4,15 +4,26 @@ import * as path from "node:path";
 import { stdin as input, stdout as output } from "node:process";
 import * as readline from "node:readline/promises";
 import { KciClient } from "../api/client";
+import type {
+	DepartureBoardItem,
+	DepartureBoardResponse,
+	StationItem,
+	StationMasterResponse,
+} from "../api/schemas";
+import {
+	computeBoardResponseHash,
+	computeStationMasterHash,
+} from "../archive/hashes";
+import {
+	capturesDir,
+	snapshotDir as snapshotDirHelper,
+} from "../archive/layout";
 import {
 	type CaptureManifest,
 	CaptureManifestSchema,
 	type DayType,
-	type DepartureBoardItem,
-	type DepartureBoardResponse,
-	type StationItem,
-	type StationMasterResponse,
-} from "../api/schemas";
+} from "../archive/schemas";
+import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
 import {
 	DEFAULT_REGION_SCOPE,
 	REGION_GROUPS,
@@ -28,7 +39,6 @@ import {
 } from "../core/logger";
 import { resolveSafePath } from "../core/path";
 import { loadHolidays } from "../db/holidays";
-import { computeBoardResponseHash, computeStationMasterHash } from "./manifest";
 
 export interface CaptureOptions {
 	client?: KciClient;
@@ -93,65 +103,7 @@ async function defaultPrompt(
 	}
 }
 
-/**
- * Scans a directory for numerical subdirectories representing version numbers.
- */
-export async function scanTimetableVersions(
-	dataDir: string,
-): Promise<number[]> {
-	try {
-		const safeDataDir = resolveSafePath(dataDir);
-		const entries = await fs.readdir(safeDataDir, { withFileTypes: true });
-		return entries
-			.filter((e) => e.isDirectory() && /^\d+$/.test(e.name))
-			.map((e) => Number.parseInt(e.name, 10))
-			.sort((a, b) => a - b);
-	} catch {
-		return [];
-	}
-}
-
-/**
- * Scans captures directory for numeric snapshot IDs and their manifests.
- */
-export async function scanSnapshots(
-	dataDir: string,
-	version: number,
-): Promise<Array<{ id: number; manifest: CaptureManifest }>> {
-	try {
-		const safeDataDir = resolveSafePath(dataDir);
-		const capturesDir = resolveSafePath(
-			path.join(safeDataDir, String(version), "captures"),
-			safeDataDir,
-		);
-		const entries = await fs.readdir(capturesDir, { withFileTypes: true });
-		const snapshotIds = entries
-			.filter((e) => e.isDirectory() && /^\d+$/.test(e.name))
-			.map((e) => Number.parseInt(e.name, 10))
-			.sort((a, b) => a - b);
-
-		const snapshots: Array<{ id: number; manifest: CaptureManifest }> = [];
-		for (const id of snapshotIds) {
-			const manifestPath = resolveSafePath(
-				path.join(capturesDir, String(id), "manifest.json"),
-				capturesDir,
-			);
-			try {
-				const content = await fs.readFile(manifestPath, "utf-8");
-				const parsed = CaptureManifestSchema.parse(JSON.parse(content));
-				snapshots.push({ id, manifest: parsed });
-			} catch (manifestErr) {
-				console.warn(
-					`Warning: Failed to parse manifest at ${manifestPath}:`,
-					manifestErr,
-				);
-			}
-		}
-		return snapshots;
-	} catch {
-		return [];
-	}
-}
+export { scanSnapshots, scanTimetableVersions };
 
 /**
  * Filters the station list to operational passenger stops in the active region.
@@ -484,13 +436,11 @@ export async function writeSnapshotToDisk(
 			: 1;
 
 	const safeDataDir = resolveSafePath(params.dataDir ?? "data/raw");
-	const capturesParent = resolveSafePath(
-		path.join(safeDataDir, String(params.versionToUse), "captures"),
+	const capturesParent = capturesDir(safeDataDir, params.versionToUse);
+	const snapshotDir = snapshotDirHelper(
 		safeDataDir,
-	);
-	const snapshotDir = resolveSafePath(
-		path.join(capturesParent, String(nextSnapshotId)),
-		capturesParent,
+		params.versionToUse,
+		nextSnapshotId,
 	);
 	const tmpDir = resolveSafePath(
 		path.join(capturesParent, `.tmp_${nextSnapshotId}_${Date.now()}`),

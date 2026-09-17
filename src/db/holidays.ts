@@ -1,7 +1,7 @@
 // src/db/holidays.ts
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { HolidayFileSchema, type HolidayItem } from "../api/schemas";
+import { HolidayFileSchema, type HolidayItem } from "../core/calendar";
 
 /**
  * Loads and validates version-controlled statutory holidays from data/holidays.json (ADR 15).

@@ -1,6 +1,6 @@
 // src/census/sample.ts
 import type { KciClient } from "../api/client";
-import type { DayType } from "../api/schemas";
+import type { DayType } from "../archive/schemas";
 import { payloadHash } from "../core/canonical";
 import type { DiscoveredTrain } from "./discovery";
 import { getItineraryPath, readItineraryEnvelope } from "./envelope";

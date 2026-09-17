@@ -2,12 +2,10 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { KciClient } from "../api/client";
-import type {
-	DayType,
-	ItineraryObservation,
-	ItineraryStop,
-} from "../api/schemas";
-import { scanSnapshots, scanTimetableVersions } from "../capture";
+import type { ItineraryStop } from "../api/schemas";
+import { itinerariesDir as getItinerariesDir } from "../archive/layout";
+import type { DayType, ItineraryObservation } from "../archive/schemas";
+import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
 import { payloadHash } from "../core/canonical";
 import { type CommitResult, commitPath } from "../core/git";
 import {
@@ -157,10 +155,7 @@ export async function executeCensus(
 		);
 	}
 
-	const itinerariesDir = resolveSafePath(
-		path.join(safeDataDir, String(version), "itineraries"),
-		safeDataDir,
-	);
+	const itinerariesDir = getItinerariesDir(safeDataDir, version);
 	await fs.mkdir(itinerariesDir, { recursive: true });
 
 	// 4. Stratified Spot-Check (Sampling 5 representative corridors when baseline cache exists)
@@ -454,10 +449,7 @@ export async function commitCensus(
 	let resolvedItinerariesDir: string;
 	try {
 		const safeDataDir = resolveSafePath(options.dataDir, cwd);
-		resolvedItinerariesDir = resolveSafePath(
-			path.join(safeDataDir, String(options.version), "itineraries"),
-			cwd,
-		);
+		resolvedItinerariesDir = getItinerariesDir(safeDataDir, options.version);
 	} catch (err) {
 		return {
 			committed: false,

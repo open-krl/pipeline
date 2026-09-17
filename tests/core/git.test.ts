@@ -6,7 +6,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import type { CaptureManifest } from "../../src/api/schemas";
+import type { CaptureManifest } from "../../src/archive/schemas";
 import {
 	commitCaptureSnapshot,
 	formatSnapshotCommitMessage,
