@@ -46,7 +46,6 @@ export function analyzeDayTypeCalendar(params: {
 	);
 	const hasSunday = Boolean(params.sundayTrips && params.sundayTrips.size > 0);
 
-	const matchedWeekday = new Set<string>();
 	const matchedSaturday = new Set<string>();
 	const matchedSunday = new Set<string>();
 	function buildCluster(
@@ -83,8 +82,6 @@ export function analyzeDayTypeCalendar(params: {
 
 	// Step 1: Cluster starting from Weekday services
 	for (const w of wTrips.values()) {
-		matchedWeekday.add(w.trainId);
-
 		const saMatch = hasSaturday
 			? findBestFingerprintCandidate(w, saTrips, matchedSaturday, tolerance)
 			: null;

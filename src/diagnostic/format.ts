@@ -81,8 +81,14 @@ export function formatBoardDiff(
 
 	if (diff.relettered.length > 0) {
 		lines.push(`  Re-lettered Services (${diff.relettered.length}):`);
-		for (const item of diff.relettered) {
-			lines.push(`    ~ ${item.details}`);
+		const limit = options.detail ? diff.relettered.length : 10;
+		for (let i = 0; i < limit && i < diff.relettered.length; i++) {
+			lines.push(`    ~ ${diff.relettered[i].details}`);
+		}
+		if (!options.detail && diff.relettered.length > limit) {
+			lines.push(
+				`    ... and ${diff.relettered.length - limit} more (use --detail to view all)`,
+			);
 		}
 	}
 

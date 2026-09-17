@@ -303,7 +303,7 @@ export function matchTripsByFingerprint(
 
 	// Pass 2: Fingerprint matching for remaining unmatched trips (§4.1)
 	// Match on: base_train_no, dest, origin, and arrival_time within tolerance (best min-delta match)
-	const remainingBefore = Array.from(tripsBefore.values()).filter(
+	let remainingBefore = Array.from(tripsBefore.values()).filter(
 		(t) => !matchedBeforeIds.has(t.trainId),
 	);
 	const remainingAfter = Array.from(tripsAfter.values()).filter(
@@ -311,60 +311,47 @@ export function matchTripsByFingerprint(
 	);
 
 	for (const afterTrip of remainingAfter) {
-		let bestIndex = -1;
-		let minDelta = Number.POSITIVE_INFINITY;
+		const result = findBestFingerprintCandidate(
+			afterTrip,
+			remainingBefore,
+			matchedBeforeIds,
+			tolerance,
+		);
+		if (!result) continue;
 
-		for (let i = 0; i < remainingBefore.length; i++) {
-			const beforeTrip = remainingBefore[i];
-			if (
-				beforeTrip.baseTrainNo === afterTrip.baseTrainNo &&
-				beforeTrip.dest === afterTrip.dest &&
-				(beforeTrip.originStation === "UNKNOWN" ||
-					afterTrip.originStation === "UNKNOWN" ||
-					beforeTrip.originStation === afterTrip.originStation)
-			) {
-				const delta = Math.abs(
-					beforeTrip.destTimeSecs - afterTrip.destTimeSecs,
-				);
-				if (delta <= tolerance && delta < minDelta) {
-					minDelta = delta;
-					bestIndex = i;
-				}
-			}
-		}
+		const beforeTrip = result.match;
+		matchedBeforeIds.add(beforeTrip.trainId);
+		matchedAfterIds.add(afterTrip.trainId);
+		remainingBefore = remainingBefore.filter(
+			(t) => t.trainId !== beforeTrip.trainId,
+		);
 
-		if (bestIndex >= 0) {
-			const beforeTrip = remainingBefore[bestIndex];
-			remainingBefore.splice(bestIndex, 1);
-			matchedAfterIds.add(afterTrip.trainId);
+		const destDeltaSecs = afterTrip.destTimeSecs - beforeTrip.destTimeSecs;
+		const deltaMins = Math.round(destDeltaSecs / 60);
+		const sign = destDeltaSecs >= 0 ? "+" : "";
 
-			const destDeltaSecs = afterTrip.destTimeSecs - beforeTrip.destTimeSecs;
-			const deltaMins = Math.round(destDeltaSecs / 60);
-			const sign = destDeltaSecs >= 0 ? "+" : "";
-
-			if (destDeltaSecs === 0) {
-				relettered.push({
-					classification: "relettered",
-					baseTrainNo: afterTrip.baseTrainNo,
-					trainIdBefore: beforeTrip.trainId,
-					trainIdAfter: afterTrip.trainId,
-					originStation: afterTrip.originStation,
-					dest: afterTrip.dest,
-					timeDeltaSecs: 0,
-					details: `Re-lettered: ${beforeTrip.trainId} -> ${afterTrip.trainId} (identical path & timings)`,
-				});
-			} else {
-				relettered.push({
-					classification: "relettered_and_retimed",
-					baseTrainNo: afterTrip.baseTrainNo,
-					trainIdBefore: beforeTrip.trainId,
-					trainIdAfter: afterTrip.trainId,
-					originStation: afterTrip.originStation,
-					dest: afterTrip.dest,
-					timeDeltaSecs: destDeltaSecs,
-					details: `Re-lettered & Retimed: ${beforeTrip.trainId} -> ${afterTrip.trainId} (${sign}${deltaMins}m arrival at ${afterTrip.dest})`,
-				});
-			}
+		if (destDeltaSecs === 0) {
+			relettered.push({
+				classification: "relettered",
+				baseTrainNo: afterTrip.baseTrainNo,
+				trainIdBefore: beforeTrip.trainId,
+				trainIdAfter: afterTrip.trainId,
+				originStation: afterTrip.originStation,
+				dest: afterTrip.dest,
+				timeDeltaSecs: 0,
+				details: `Re-lettered: ${beforeTrip.trainId} -> ${afterTrip.trainId} (identical path & timings)`,
+			});
+		} else {
+			relettered.push({
+				classification: "relettered_and_retimed",
+				baseTrainNo: afterTrip.baseTrainNo,
+				trainIdBefore: beforeTrip.trainId,
+				trainIdAfter: afterTrip.trainId,
+				originStation: afterTrip.originStation,
+				dest: afterTrip.dest,
+				timeDeltaSecs: destDeltaSecs,
+				details: `Re-lettered & Retimed: ${beforeTrip.trainId} -> ${afterTrip.trainId} (${sign}${deltaMins}m arrival at ${afterTrip.dest})`,
+			});
 		}
 	}
 
