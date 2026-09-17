@@ -411,13 +411,19 @@ Duration:           ${result.durationSecs}s${logStr}
 			) => {
 				let version: number | undefined;
 				if (versionArg !== undefined) {
-					if (!/^\d+$/.test(versionArg.trim())) {
+					const trimmed = versionArg.trim();
+					const parsed = Number.parseInt(trimmed, 10);
+					if (
+						!/^\d+$/.test(trimmed) ||
+						!Number.isSafeInteger(parsed) ||
+						parsed <= 0
+					) {
 						console.error(
 							`Error: Invalid version '${versionArg}'. Must be a positive integer.`,
 						);
 						process.exit(1);
 					}
-					version = Number.parseInt(versionArg, 10);
+					version = parsed;
 				}
 
 				console.log("Starting KRL schedule database compilation...");
