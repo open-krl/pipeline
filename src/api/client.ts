@@ -163,10 +163,13 @@ export class KciClient {
 				retryOnTimeout: true,
 			},
 			hooks: {
-				beforeRequest: [async () => this.paceRequest()],
+				beforeRequest: [
+					async ({ request, retryCount }) =>
+						this.startRequestAttempt(request, retryCount),
+				],
 				beforeRetry: [
 					async ({ request, error, retryCount }) => {
-						await this.paceRequest();
+						await this.startRequestAttempt(request, retryCount);
 						const detail = isHTTPError(error)
 							? error.response.status === 429
 								? "[RATE LIMIT] 429"
@@ -209,11 +212,22 @@ export class KciClient {
 		return error instanceof Error ? error : new Error(String(error));
 	}
 
-	/** Schedules one globally paced HTTP attempt without occupying a request permit. */
-	private async paceRequest(): Promise<void> {
+	/** Schedules and records one HTTP attempt without occupying a request permit. */
+	private async startRequestAttempt(
+		request: Request,
+		retryCount: number,
+	): Promise<void> {
 		if (this.pacingMs > 0) {
 			await this.pacingQueue.add(() => undefined);
 		}
+
+		this.logger?.debug("api", "http_attempt_started", "HTTP attempt started", {
+			url: request.url,
+			method: request.method,
+			retryCount,
+			pacingMs: this.pacingMs,
+			attemptStartedAt: new Date().toISOString(),
+		});
 	}
 
 	/**

@@ -46,7 +46,7 @@ export function resolveCaptureContext(options: CaptureOptions) {
 				now,
 				baseDir: options.dataDir ? dataDir : undefined,
 			});
-		logger = new StructuredLogger({ logFilePath });
+		logger = new StructuredLogger({ logFilePath, minLevel: "debug" });
 	} else if (!logger) {
 		logger = new StructuredLogger();
 	}

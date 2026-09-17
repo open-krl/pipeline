@@ -6,6 +6,7 @@ import {
 	type FetchFunction,
 	KciClient,
 } from "../../src/api/client";
+import { StructuredLogger } from "../../src/core/logger";
 
 describe("src/api/client - AsyncSemaphore", () => {
 	it("enforces max concurrency limit under concurrent load", async () => {
@@ -129,6 +130,12 @@ describe("src/api/client - KciClient", () => {
 			);
 		};
 
+		const attemptLogs: Array<Record<string, unknown>> = [];
+		const logger = new StructuredLogger();
+		logger.debug = (_scope, _event, _message, data = {}) => {
+			attemptLogs.push(data);
+		};
+
 		const pacingMs = 40;
 		const client = new KciClient({
 			baseUrl: "https://mock.kci.id",
@@ -136,6 +143,7 @@ describe("src/api/client - KciClient", () => {
 			pacingMs,
 			retryBaseMs: 1,
 			maxRetries: 1,
+			logger,
 		});
 
 		await client.fetchStations();
@@ -144,6 +152,25 @@ describe("src/api/client - KciClient", () => {
 		expect(requestStarts[1] - requestStarts[0]).toBeGreaterThanOrEqual(
 			pacingMs - 10,
 		);
+		expect(attemptLogs).toHaveLength(2);
+		expect(attemptLogs).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					url: "https://mock.kci.id/api/krl/stations",
+					method: "GET",
+					retryCount: 0,
+					pacingMs,
+				}),
+				expect.objectContaining({
+					retryCount: 1,
+				}),
+			]),
+		);
+		for (const attempt of attemptLogs) {
+			expect(attempt.attemptStartedAt).toMatch(
+				/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/,
+			);
+		}
 	});
 
 	it("fetches station schedule with default time window", async () => {
