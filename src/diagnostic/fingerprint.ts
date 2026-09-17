@@ -272,6 +272,30 @@ export function matchTripsByFingerprint(
 			}
 		}
 
+		if (commonStops === 0 || beforeTrip.dest !== afterTrip.dest) {
+			withdrawn.push({
+				classification: "withdrawn",
+				baseTrainNo: beforeTrip.baseTrainNo,
+				trainIdBefore: trainId,
+				trainIdAfter: null,
+				originStation: beforeTrip.originStation,
+				dest: beforeTrip.dest,
+				timeDeltaSecs: 0,
+				details: `${trainId}: Withdrawn (${beforeTrip.originStation} -> ${beforeTrip.dest})`,
+			});
+			added.push({
+				classification: "added",
+				baseTrainNo: afterTrip.baseTrainNo,
+				trainIdBefore: null,
+				trainIdAfter: trainId,
+				originStation: afterTrip.originStation,
+				dest: afterTrip.dest,
+				timeDeltaSecs: 0,
+				details: `${trainId}: Added (${afterTrip.originStation} -> ${afterTrip.dest})`,
+			});
+			continue;
+		}
+
 		if (maxAbsDelta === 0) {
 			identical.push({
 				classification: "identical",

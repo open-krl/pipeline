@@ -247,6 +247,48 @@ describe("Semantic Diff Engine — Trip Fingerprinting & Departure Boards", () =
 		expect(diff.stationCoverage.stationsOnlyInBefore).toEqual(["PSM"]);
 		expect(diff.summary).toContain("[Coverage: -1 station (missing: PSM)]");
 	});
+
+	it("treats reused train_id with divergent destination or zero common stops as withdrawn and added", () => {
+		const boardBefore: Record<string, DepartureBoardItem[]> = {
+			MRI: [
+				{
+					train_id: "5000",
+					ka_name: "COMMUTER LINE BOGOR",
+					route_name: "JAKK-BOO",
+					dest: "BOGOR",
+					time_est: "06:00:00",
+					color: "#ED1B24",
+					dest_time: "07:00:00",
+				},
+			],
+		};
+		const boardAfterDivergentDest: Record<string, DepartureBoardItem[]> = {
+			MRI: [
+				{
+					train_id: "5000",
+					ka_name: "COMMUTER LINE CIKARANG",
+					route_name: "JAKK-CKR",
+					dest: "CIKARANG",
+					time_est: "06:00:00",
+					color: "#0072C6",
+					dest_time: "07:00:00",
+				},
+			],
+		};
+
+		const diff = diffDepartureBoards({
+			boardsBefore: boardBefore,
+			boardsAfter: boardAfterDivergentDest,
+		});
+
+		expect(diff.identicalCount).toBe(0);
+		expect(diff.withdrawn.length).toBe(1);
+		expect(diff.withdrawn[0].trainIdBefore).toBe("5000");
+		expect(diff.withdrawn[0].dest).toBe("BOGOR");
+		expect(diff.added.length).toBe(1);
+		expect(diff.added[0].trainIdAfter).toBe("5000");
+		expect(diff.added[0].dest).toBe("CIKARANG");
+	});
 });
 
 describe("Semantic Diff Engine — Train Itinerary", () => {
