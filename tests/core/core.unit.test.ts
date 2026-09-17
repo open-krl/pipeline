@@ -4,7 +4,7 @@ import {
 	computeBoardResponseHash,
 	computeStationMasterHash,
 } from "../../src/archive/hashes";
-import { resolveStationCode } from "../../src/config";
+import { resolveStationCode, resolveTripStationCode } from "../../src/config";
 import {
 	foldDayTypeRule,
 	formatDateWib,
@@ -288,9 +288,17 @@ describe("src/core/manifest", () => {
 });
 
 describe("src/config", () => {
-	it("resolves station code overrides for known upstream defects and operational diversions", () => {
+	it("resolves global station code aliases for identical physical stations", () => {
 		expect(resolveStationCode("GGL")).toBe("GRG");
-		expect(resolveStationCode("KAT")).toBe("SUDB");
+		expect(resolveStationCode("KAT")).toBe("KAT");
 		expect(resolveStationCode("MRI")).toBe("MRI");
+		expect(resolveStationCode("constructor")).toBe("constructor");
+	});
+
+	it("resolves trip-scoped station overrides for specific upstream migration glitches", () => {
+		expect(resolveTripStationCode("5169D", "KAT")).toBe("SUDB");
+		expect(resolveTripStationCode("5169D", "MRI")).toBe("MRI");
+		expect(resolveTripStationCode("5022", "KAT")).toBe("KAT");
+		expect(resolveTripStationCode("5169D", "constructor")).toBe("constructor");
 	});
 });

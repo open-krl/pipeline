@@ -55,26 +55,51 @@ export const CORRIDOR_REFERENCE_STATIONS = {
 } as const;
 
 /**
- * Station code overrides for known upstream KCI API defects and operational diversions.
+ * Station code aliases for known upstream KCI API defects.
+ * Strictly used when two codes represent the SAME physical station entity.
  *
  * 1. GGL -> GRG (Grogol):
  *    KCI's station catalog (`/api/krl/stations`) registers Grogol under `GGL`.
  *    However, the station departure board endpoint (`/api/krl/schedules?stationid=...`)
  *    returns 404 for `GGL`, train itinerary stops (`/api/krl/train-schedule`) emit `GRG`, and
  *    official KCI published timetable PDFs print `GRG`.
- *
- * 2. KAT -> SUDB (Stasiun Karet -> Stasiun BNI City / Sudirman Baru):
- *    Starting September 1, 2026, KAI Commuter temporarily suspended passenger operations
- *    at Stasiun Karet (`KAT`) for integration works, diverting all 264 daily Cikarang corridor
- *    stops to Stasiun BNI City (`SUDB`). Upstream KCI updated their itinerary database for 263
- *    trains to emit `SUDB`, but missed train `5169D` which still emitted `KAT`. Mapping `KAT` ->
- *    `SUDB` aligns the un-migrated record with physical reality and the rest of the dataset.
  */
 export const STATION_CODE_OVERRIDES: Readonly<Record<string, string>> = {
 	GGL: "GRG",
-	KAT: "SUDB",
+};
+
+/**
+ * Trip-scoped itinerary station overrides for specific upstream database migration glitches.
+ * Constrained strictly to specific trip IDs to avoid corrupting distinct physical station
+ * identities (e.g. Stasiun Karet vs. Stasiun BNI City) for other services or non-passenger operations.
+ *
+ * Train 5169D:
+ * KAI Commuter Sept 1, 2026 operational diversion: 263 out of 264 daily Cikarang Line services
+ * were updated to emit Stasiun BNI City (`SUDB`), but train 5169D was missed in KCI's backend
+ * update and still emitted Stasiun Karet (`KAT`).
+ */
+export const TRIP_STATION_OVERRIDES: Readonly<
+	Record<string, Readonly<Record<string, string>>>
+> = {
+	"5169D": {
+		KAT: "SUDB",
+	},
 };
 
 export function resolveStationCode(stationId: string): string {
-	return STATION_CODE_OVERRIDES[stationId] ?? stationId;
+	if (Object.hasOwn(STATION_CODE_OVERRIDES, stationId)) {
+		return STATION_CODE_OVERRIDES[stationId];
+	}
+	return stationId;
+}
+
+export function resolveTripStationCode(
+	tripId: string,
+	stationId: string,
+): string {
+	const tripOverrides = TRIP_STATION_OVERRIDES[tripId];
+	if (tripOverrides && Object.hasOwn(tripOverrides, stationId)) {
+		return tripOverrides[stationId];
+	}
+	return resolveStationCode(stationId);
 }

@@ -99,17 +99,26 @@ When `fold.ts` processed `5169D`:
 
 ## 5. Resolution & Rationale
 
-We resolved this upstream defect by mapping `KAT` to `SUDB` in `STATION_CODE_OVERRIDES` (`src/config.ts`):
+Rather than establishing a global station alias that would conflate two physically distinct stations (Stasiun Karet, km 2+026 and Stasiun BNI City, km 2+500) and risk corrupting non-passenger stops, we resolved this upstream defect by applying a **surgical, trip-scoped override** (`TRIP_STATION_OVERRIDES` in `src/config.ts`):
 
 ```typescript
-export const STATION_CODE_OVERRIDES: Readonly<Record<string, string>> = {
-    GGL: "GRG",
-    KAT: "SUDB", // KAI Commuter Sept 1, 2026 operational diversion (Train 5169D unmigrated record)
+export const TRIP_STATION_OVERRIDES: Readonly<
+    Record<string, Readonly<Record<string, string>>>
+> = {
+    "5169D": {
+        KAT: "SUDB", // KAI Commuter Sept 1, 2026 operational diversion (Train 5169D unmigrated record)
+    },
 };
+
+export function resolveTripStationCode(tripId: string, stationId: string): string {
+    return TRIP_STATION_OVERRIDES[tripId]?.[stationId] ?? resolveStationCode(stationId);
+}
 ```
 
 ### Rationale:
-1. **Fidelity to Physical Reality:** During Timetable Version 1 (September 2026), trains physically called at Stasiun BNI City (`SUDB`) where passengers boarded, not at the suspended Karet platforms.
-2. **Dataset Homogeneity:** Aligns `5169D` with the other 263 corridor services in the active edition.
-3. **Full Itinerary Restoration:** With `resolveStationCode("KAT") === "SUDB"`, `5169D` satisfies Invariant 9, Invariant 6 (Monotonicity), and Invariant 5 (Terminus Alignment), compiling cleanly with `source: "itinerary"` and 15 stops.
-4. **Final Build Tally:** Brings Timetable Version 1 compilation to **1,139 / 1,139 (100%) itinerary trips**, with **0 reconstructed trips** and 19 legitimate quarantines (12 non-revenue deadhead runs and 7 regional diesel trains).
+1. **Principle of Minimum Blast Radius:** Constrains the override strictly to `trip_id == "5169D"`. No other service—passenger, non-passenger, maintenance run, or future service—will ever have its stop identity mutated from Karet to BNI City.
+2. **Fidelity to Physical Reality:** During Timetable Version 1 (September 2026), passenger boarding for `5169D` physically took place at Stasiun BNI City (`SUDB`), exactly like its other 263 peer corridor runs.
+3. **Dataset Homogeneity & Full Itinerary Restoration:** With `resolveTripStationCode("5169D", "KAT") === "SUDB"`, `5169D` satisfies Invariant 9, Invariant 6 (Monotonicity), and Invariant 5 (Terminus Alignment), compiling cleanly with `source: "itinerary"` and 15 stops.
+4. **Soft Quarantine Fail-Safe:** If any future train ever carries an unmigrated or anomalous stop at `KAT`, it is not silently rewritten; it automatically triggers Invariant 9, falling back to topological board reconstruction (`source = "reconstructed"`) to be surfaced and audited.
+5. **Final Build Tally:** Brings Timetable Version 1 compilation to **1,139 / 1,139 (100%) itinerary trips**, with **0 reconstructed trips** and 19 legitimate quarantines (12 non-revenue deadhead runs and 7 regional diesel trains).
+
