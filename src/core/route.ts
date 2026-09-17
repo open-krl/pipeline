@@ -37,15 +37,25 @@ export function parseRouteName(routeNameRaw: string): ParsedRoute {
 }
 
 /**
- * Resolves a station code from a station catalog using whitespace-insensitive matching (§4.3).
+ * Cleans a destination string by stripping trailing bypass/via markers
+ * (e.g. "CIKARANG VIA MRI" -> "CIKARANG").
+ */
+export function cleanDestinationName(dest: string): string {
+	return dest.replace(/\s+VIA\s+.*$/i, "").trim();
+}
+
+/**
+ * Resolves a station code from a station catalog using whitespace-insensitive matching,
+ * stripping bypass markers and handling common spelling variants (§4.3).
  */
 export function resolveStationId(
 	token: string,
 	stationsCatalog: ReadonlyArray<{ sta_id: string; sta_name: string }>,
 ): string | null {
-	const normalizedToken = token.replace(/\s+/g, "").toUpperCase();
+	const cleaned = cleanDestinationName(token);
+	const normalizedToken = cleaned.replace(/\s+/g, "").toUpperCase();
 
-	// Check by normalized station name
+	// 1. Check by normalized station name
 	const byName = stationsCatalog.find(
 		(s) => s.sta_name.replace(/\s+/g, "").toUpperCase() === normalizedToken,
 	);
@@ -53,7 +63,20 @@ export function resolveStationId(
 		return byName.sta_id;
 	}
 
-	// Check by direct station ID (e.g. if code was passed)
+	// 2. Check with known spelling variants (e.g. PRIUK <-> PRIOK for Tanjung Priok)
+	const transliteratedToken = normalizedToken.replace(/PRIUK/g, "PRIOK");
+	const byTransliteration = stationsCatalog.find(
+		(s) =>
+			s.sta_name
+				.replace(/\s+/g, "")
+				.toUpperCase()
+				.replace(/PRIUK/g, "PRIOK") === transliteratedToken,
+	);
+	if (byTransliteration) {
+		return byTransliteration.sta_id;
+	}
+
+	// 3. Check by direct station ID (e.g. if code was passed)
 	const byId = stationsCatalog.find(
 		(s) => s.sta_id.toUpperCase() === normalizedToken,
 	);

@@ -5,6 +5,7 @@ import * as readline from "node:readline/promises";
 import { cac } from "cac";
 import { type DayType, DayTypeSchema } from "./archive/schemas";
 import { scanSnapshots, scanTimetableVersions } from "./archive/snapshots";
+import { executeBuild } from "./build/build";
 import { commitCaptureSnapshot, executeCapture } from "./capture/capture";
 import { formatSnapshotTable, getSnapshotList } from "./capture/snapshots";
 import { executeCensus } from "./census/census";
@@ -379,12 +380,91 @@ Duration:           ${result.durationSecs}s${logStr}
 			},
 		);
 
-	// 5. Future milestones
+	// 5. build
+	cli
+		.command(
+			"build [version]",
+			"Compile SQLite database, resolve services & presence (§10)",
+		)
+		.option("--data-dir <path>", "Override raw data root directory", {
+			default: "data/raw",
+		})
+		.option("--out-dir <path>", "Override build output directory", {
+			default: "data/build",
+		})
+		.option("--db-path <path>", "Override destination SQLite database path")
+		.option("--holidays-path <path>", "Override holidays JSON path")
+		.option(
+			"--coordinates-path <path>",
+			"Override station coordinates CSV path",
+		)
+		.action(
+			async (
+				versionArg: string | undefined,
+				options: {
+					dataDir?: string;
+					outDir?: string;
+					dbPath?: string;
+					holidaysPath?: string;
+					coordinatesPath?: string;
+				},
+			) => {
+				let version: number | undefined;
+				if (versionArg !== undefined) {
+					const trimmed = versionArg.trim();
+					const parsed = Number.parseInt(trimmed, 10);
+					if (
+						!/^\d+$/.test(trimmed) ||
+						!Number.isSafeInteger(parsed) ||
+						parsed <= 0
+					) {
+						console.error(
+							`Error: Invalid version '${versionArg}'. Must be a positive integer.`,
+						);
+						process.exit(1);
+					}
+					version = parsed;
+				}
+
+				console.log("Starting KRL schedule database compilation...");
+				try {
+					const result = await executeBuild({
+						version,
+						dataDir: options.dataDir,
+						outDir: options.outDir,
+						dbPath: options.dbPath,
+						holidaysPath: options.holidaysPath,
+						coordinatesPath: options.coordinatesPath,
+					});
+
+					const stateStr = result.stats.calendarResolved
+						? "resolved (3/3 day types confirmed)"
+						: `provisional (${result.stats.dayTypesCaptured}/3 day types observed)`;
+
+					console.log(`
+── Build Summary ────────────────────────────────────────────
+Timetable Version:  ${result.timetableVersion}
+Database Target:    ${result.dbPath}
+Snapshots Folded:   ${result.snapshotsFolded} complete snapshot(s)
+Calendar State:     ${stateStr}
+Trips Compiled:     ${result.stats.totalTrips} total (${result.stats.itineraryTrips} itinerary, ${result.stats.reconstructedTrips} reconstructed)
+Quarantined Trips:  ${result.stats.quarantinedTrips} (isolated in quarantined_trips table)
+Total Stations:     ${result.stats.totalStations} stations
+Total Stop Events:  ${result.stats.totalStops.toLocaleString()} stops
+Compilation Time:   ${result.durationSecs}s
+─────────────────────────────────────────────────────────────
+`);
+				} catch (err) {
+					console.error(
+						`Build failed: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+			},
+		);
+
+	// 6. Future milestones
 	const upcomingCommands = [
-		{
-			name: "build",
-			desc: "Compile SQLite database, resolve services & presence (§10)",
-		},
 		{
 			name: "export",
 			desc: "Generate standard GTFS feeds (§11)",

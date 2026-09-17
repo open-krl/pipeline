@@ -55,19 +55,24 @@ export const CORRIDOR_REFERENCE_STATIONS = {
 } as const;
 
 /**
- * Station code overrides for known upstream KCI API defects.
+ * Station code overrides for known upstream KCI API defects and operational diversions.
  *
- * Upstream defect: KCI's station catalog (`/api/krl/stations`) registers Grogol
- * under `GGL`. However, the station departure board endpoint (`/api/krl/schedules?stationid=...`)
- * returns 404 for `GGL`, train itinerary stops (`/api/krl/train-schedule`) emit `GRG`, and
- * official KCI published timetable PDFs print `GRG`.
+ * 1. GGL -> GRG (Grogol):
+ *    KCI's station catalog (`/api/krl/stations`) registers Grogol under `GGL`.
+ *    However, the station departure board endpoint (`/api/krl/schedules?stationid=...`)
+ *    returns 404 for `GGL`, train itinerary stops (`/api/krl/train-schedule`) emit `GRG`, and
+ *    official KCI published timetable PDFs print `GRG`.
  *
- * Mapping `GGL` -> `GRG` during departure board queries and persistence ensures that
- * all downstream components (departure boards, itineraries, GIS coordinates, and SQLite)
- * share the canonical telegraphic code `GRG`.
+ * 2. KAT -> SUDB (Stasiun Karet -> Stasiun BNI City / Sudirman Baru):
+ *    Starting September 1, 2026, KAI Commuter temporarily suspended passenger operations
+ *    at Stasiun Karet (`KAT`) for integration works, diverting all 264 daily Cikarang corridor
+ *    stops to Stasiun BNI City (`SUDB`). Upstream KCI updated their itinerary database for 263
+ *    trains to emit `SUDB`, but missed train `5169D` which still emitted `KAT`. Mapping `KAT` ->
+ *    `SUDB` aligns the un-migrated record with physical reality and the rest of the dataset.
  */
 export const STATION_CODE_OVERRIDES: Readonly<Record<string, string>> = {
 	GGL: "GRG",
+	KAT: "SUDB",
 };
 
 export function resolveStationCode(stationId: string): string {

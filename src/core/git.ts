@@ -57,6 +57,35 @@ export async function getGitCommitHash(
 }
 
 /**
+ * Resolves the latest commit hash that touched a specific file or directory path.
+ * Runs `git log -n 1 --format=%H -- <targetPath>`. Returns null if path has no commit.
+ */
+export async function getGitCommitForPath(
+	targetPath: string,
+	cwd = process.cwd(),
+): Promise<string | null> {
+	try {
+		const { stdout } = await execFileAsync(
+			"git",
+			[
+				"--literal-pathspecs",
+				"log",
+				"-n",
+				"1",
+				"--format=%H",
+				"--",
+				targetPath,
+			],
+			{ cwd },
+		);
+		const hash = stdout.trim();
+		return hash || null;
+	} catch {
+		return null;
+	}
+}
+
+/**
  * Atomically stages and commits a specific directory or file path to git
  * with strict containment and contamination guards.
  */
