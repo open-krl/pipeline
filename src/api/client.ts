@@ -1,5 +1,6 @@
 // src/api/client.ts
 import ky, { isHTTPError } from "ky";
+import PQueue from "p-queue";
 import {
 	API_BASE_URL,
 	API_HEADERS,
@@ -88,8 +89,6 @@ export interface KciClientOptions {
 	logger?: StructuredLogger;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 /** Retry on timeouts, rate limits, and all 5xx — mirroring the old manual loop. */
 const RETRYABLE_STATUS_CODES = [
 	408,
@@ -102,7 +101,8 @@ type Ky = ReturnType<typeof ky.create>;
 
 /**
  * Resilient HTTP client for KCI endpoints built on `ky`, with concurrency
- * pooling, pacing, jittered exponential backoff, and schema-validated responses.
+ * pooling, globally paced request starts, jittered exponential backoff, and
+ * schema-validated responses.
  */
 export class KciClient {
 	readonly baseUrl: string;
@@ -117,6 +117,7 @@ export class KciClient {
 	readonly logger?: StructuredLogger;
 
 	private readonly ky: Ky;
+	private readonly pacingQueue: PQueue;
 
 	constructor(options: KciClientOptions = {}) {
 		this.baseUrl = `${(options.baseUrl ?? API_BASE_URL).replace(/\/+$/, "")}/`;
@@ -133,6 +134,12 @@ export class KciClient {
 		this.maxRetries = options.maxRetries ?? RETRY.maxRetries;
 		this.timeoutMs = options.timeoutMs ?? 15000;
 		this.logger = options.logger;
+		this.pacingQueue = new PQueue({
+			concurrency: 1,
+			interval: Math.max(this.pacingMs, 1),
+			intervalCap: 1,
+			strict: true,
+		});
 
 		this.ky = ky.create({
 			baseUrl: this.baseUrl,
@@ -156,8 +163,10 @@ export class KciClient {
 				retryOnTimeout: true,
 			},
 			hooks: {
+				beforeRequest: [async () => this.paceRequest()],
 				beforeRetry: [
-					({ request, error, retryCount }) => {
+					async ({ request, error, retryCount }) => {
+						await this.paceRequest();
 						const detail = isHTTPError(error)
 							? error.response.status === 429
 								? "[RATE LIMIT] 429"
@@ -200,9 +209,10 @@ export class KciClient {
 		return error instanceof Error ? error : new Error(String(error));
 	}
 
-	private async pace(): Promise<void> {
+	/** Schedules one globally paced HTTP attempt without occupying a request permit. */
+	private async paceRequest(): Promise<void> {
 		if (this.pacingMs > 0) {
-			await sleep(this.pacingMs);
+			await this.pacingQueue.add(() => undefined);
 		}
 	}
 
@@ -230,7 +240,6 @@ export class KciClient {
 		const timeto = options?.timeto ?? DEFAULT_TIME_WINDOW.timeto;
 
 		return this.boardSemaphore.run(async () => {
-			await this.pace();
 			try {
 				return await this.ky
 					.get("api/krl/schedules", {
@@ -252,8 +261,6 @@ export class KciClient {
 	 */
 	async fetchTrainSchedule(trainId: string): Promise<ItineraryResponse | null> {
 		return this.censusSemaphore.run(async () => {
-			await this.pace();
-
 			try {
 				// Let 404 through as a response; everything else still throws (after retries).
 				const response = await this.ky.get("api/krl/train-schedule", {

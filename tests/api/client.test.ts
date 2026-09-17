@@ -84,6 +84,68 @@ describe("src/api/client - KciClient", () => {
 		expect(capturedRequest?.headers.get("Referer")).toBe("https://www.kci.id/");
 	});
 
+	it("globally paces concurrent request starts", async () => {
+		const requestStarts: number[] = [];
+		const mockFetch: FetchFunction = async () => {
+			requestStarts.push(performance.now());
+			return new Response(
+				JSON.stringify({ status: 200, message: "success", data: [] }),
+				{ status: 200, headers: { "Content-Type": "application/json" } },
+			);
+		};
+
+		const pacingMs = 40;
+		const client = new KciClient({
+			baseUrl: "https://mock.kci.id",
+			fetchFn: mockFetch,
+			pacingMs,
+		});
+
+		await Promise.all([
+			client.fetchStations(),
+			client.fetchStations(),
+			client.fetchStations(),
+		]);
+
+		for (let index = 1; index < requestStarts.length; index++) {
+			expect(
+				requestStarts[index] - requestStarts[index - 1],
+			).toBeGreaterThanOrEqual(pacingMs - 10);
+		}
+	});
+
+	it("paces retry attempts", async () => {
+		const requestStarts: number[] = [];
+		let callCount = 0;
+		const mockFetch: FetchFunction = async () => {
+			requestStarts.push(performance.now());
+			callCount++;
+			if (callCount === 1) {
+				return new Response("Internal Server Error", { status: 503 });
+			}
+			return new Response(
+				JSON.stringify({ status: 200, message: "success", data: [] }),
+				{ status: 200, headers: { "Content-Type": "application/json" } },
+			);
+		};
+
+		const pacingMs = 40;
+		const client = new KciClient({
+			baseUrl: "https://mock.kci.id",
+			fetchFn: mockFetch,
+			pacingMs,
+			retryBaseMs: 1,
+			maxRetries: 1,
+		});
+
+		await client.fetchStations();
+
+		expect(requestStarts).toHaveLength(2);
+		expect(requestStarts[1] - requestStarts[0]).toBeGreaterThanOrEqual(
+			pacingMs - 10,
+		);
+	});
+
 	it("fetches station schedule with default time window", async () => {
 		const mockScheduleData = {
 			status: 200,
