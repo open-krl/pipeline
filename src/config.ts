@@ -87,7 +87,10 @@ export const TRIP_STATION_OVERRIDES: Readonly<
 };
 
 export function resolveStationCode(stationId: string): string {
-	return STATION_CODE_OVERRIDES[stationId] ?? stationId;
+	if (Object.hasOwn(STATION_CODE_OVERRIDES, stationId)) {
+		return STATION_CODE_OVERRIDES[stationId];
+	}
+	return stationId;
 }
 
 export function resolveTripStationCode(
@@ -95,7 +98,7 @@ export function resolveTripStationCode(
 	stationId: string,
 ): string {
 	const tripOverrides = TRIP_STATION_OVERRIDES[tripId];
-	if (tripOverrides?.[stationId]) {
+	if (tripOverrides && Object.hasOwn(tripOverrides, stationId)) {
 		return tripOverrides[stationId];
 	}
 	return resolveStationCode(stationId);

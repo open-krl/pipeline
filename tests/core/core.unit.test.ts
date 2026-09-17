@@ -292,11 +292,13 @@ describe("src/config", () => {
 		expect(resolveStationCode("GGL")).toBe("GRG");
 		expect(resolveStationCode("KAT")).toBe("KAT");
 		expect(resolveStationCode("MRI")).toBe("MRI");
+		expect(resolveStationCode("constructor")).toBe("constructor");
 	});
 
 	it("resolves trip-scoped station overrides for specific upstream migration glitches", () => {
 		expect(resolveTripStationCode("5169D", "KAT")).toBe("SUDB");
 		expect(resolveTripStationCode("5169D", "MRI")).toBe("MRI");
 		expect(resolveTripStationCode("5022", "KAT")).toBe("KAT");
+		expect(resolveTripStationCode("5169D", "constructor")).toBe("constructor");
 	});
 });
