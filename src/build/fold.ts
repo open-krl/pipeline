@@ -1,7 +1,7 @@
 // src/build/fold.ts
 import type { ItineraryStop } from "../api/schemas";
 import type { DayType } from "../archive/schemas";
-import { resolveStationCode } from "../config";
+import { resolveStationCode, resolveTripStationCode } from "../config";
 import { resolveStationId } from "../core/route";
 import { resolveItinerarySecs, toServiceDaySecs } from "../core/time";
 import { parseTrainId } from "../core/trainid";
@@ -344,7 +344,10 @@ export function foldArchive(archive: RawArchive): FoldResult {
 			const stops = activeObservation.stops;
 			const resolvedSecs = resolveItinerarySecs(stops);
 			const lastStop = stops[stops.length - 1];
-			const lastStopStaId = resolveStationCode(lastStop.station_id);
+			const lastStopStaId = resolveTripStationCode(
+				trainId,
+				lastStop.station_id,
+			);
 
 			// Invariant 6: Strict Monotonicity
 			const isMonotonic = checkStopMonotonicity(resolvedSecs);
@@ -359,7 +362,7 @@ export function foldArchive(archive: RawArchive): FoldResult {
 
 			// Invariant 9: Referential Integrity on Itinerary Stops
 			const allStopsReferentiallyValid = stops.every((st) =>
-				validStationIds.has(resolveStationCode(st.station_id)),
+				validStationIds.has(resolveTripStationCode(trainId, st.station_id)),
 			);
 
 			if (isMonotonic && isTerminusAligned && allStopsReferentiallyValid) {
@@ -367,7 +370,7 @@ export function foldArchive(archive: RawArchive): FoldResult {
 				itineraryStatus = "200";
 				itineraryValid = true;
 				totalStops = stops.length;
-				originStationId = resolveStationCode(stops[0].station_id);
+				originStationId = resolveTripStationCode(trainId, stops[0].station_id);
 				originTime = stops[0].time_est;
 				destTime = lastStop.time_est;
 				originSecs =
@@ -382,7 +385,7 @@ export function foldArchive(archive: RawArchive): FoldResult {
 						timetable_version: version,
 						trip_id: trainId,
 						stop_sequence: idx + 1,
-						station_id: resolveStationCode(st.station_id),
+						station_id: resolveTripStationCode(trainId, st.station_id),
 						time_raw: st.time_est,
 						arrival_secs: t.arrival_secs,
 						departure_secs: t.departure_secs,
