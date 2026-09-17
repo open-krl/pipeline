@@ -13,11 +13,11 @@ import { type RegionScope, RegionScopeSchema } from "./config";
 import { resolveSafePath } from "./core/path";
 import {
 	analyzeDayTypeCalendar,
-	formatCalendarReport,
 	loadCalendarData,
 } from "./diagnostic/calendar";
 import { executeDiff } from "./diagnostic/cli-diff";
-import { executeDetect, formatDetectReport } from "./diagnostic/detect";
+import { executeDetect } from "./diagnostic/detect";
+import { formatCalendarReport, formatDetectReport } from "./diagnostic/format";
 import { executeExport } from "./export/export";
 
 export function createCli() {

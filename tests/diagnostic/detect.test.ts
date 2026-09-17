@@ -5,9 +5,16 @@ import { describe, expect, it } from "bun:test";
 import { promises as fs } from "node:fs";
 import { type FetchFunction, KciClient } from "../../src/api/client";
 import type { DepartureBoardResponse } from "../../src/api/schemas";
-import { executeDetect, formatDetectReport } from "../../src/diagnostic/detect";
+import { DRIFT_THRESHOLDS, executeDetect } from "../../src/diagnostic/detect";
+import { formatDetectReport } from "../../src/diagnostic/format";
 
 describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
+	it("exports expected operational drift thresholds", () => {
+		expect(DRIFT_THRESHOLDS.maxRelettered).toBe(5);
+		expect(DRIFT_THRESHOLDS.minCongruenceRatio).toBe(0.85);
+		expect(DRIFT_THRESHOLDS.maxAdded).toBe(5);
+		expect(DRIFT_THRESHOLDS.maxWithdrawn).toBe(10);
+	});
 	function createMockClient(
 		liveBoards: Record<string, DepartureBoardResponse>,
 	): KciClient {

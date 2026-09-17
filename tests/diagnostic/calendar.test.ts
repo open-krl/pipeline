@@ -4,11 +4,11 @@ import { Database } from "bun:sqlite";
 import { describe, expect, it } from "bun:test";
 import {
 	analyzeDayTypeCalendar,
-	formatCalendarReport,
 	loadCalendarFromDatabase,
 	loadCalendarFromSnapshots,
 } from "../../src/diagnostic/calendar";
 import type { TripSummary } from "../../src/diagnostic/fingerprint";
+import { formatCalendarReport } from "../../src/diagnostic/format";
 
 function makeTripSummary(params: {
 	trainId: string;

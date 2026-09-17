@@ -49,6 +49,36 @@ export function analyzeDayTypeCalendar(params: {
 	const matchedWeekday = new Set<string>();
 	const matchedSaturday = new Set<string>();
 	const matchedSunday = new Set<string>();
+	function buildCluster(
+		trip: TripSummary,
+		runsWeekday: boolean,
+		runsSaturday: boolean,
+		runsSunday: boolean,
+		trainIds: string[],
+		relettered: boolean,
+		retimed: boolean,
+		maxDeltaSecs: number,
+		category: CalendarServiceCluster["category"],
+	): CalendarServiceCluster {
+		return {
+			serviceKey: `${trip.baseTrainNo}_${trip.originStation}_${trip.dest}_${trip.destTimeSecs}`,
+			baseTrainNo: trip.baseTrainNo,
+			originStation: trip.originStation,
+			destStation: trip.dest,
+			lineName: trip.kaName,
+			routeName: trip.routeName,
+			isFakultatif: trip.isFakultatif,
+			runsWeekday,
+			runsSaturday,
+			runsSunday,
+			trainIds,
+			relettered,
+			retimed,
+			maxDeltaSecs,
+			category,
+		};
+	}
+
 	const clusters: CalendarServiceCluster[] = [];
 
 	// Step 1: Cluster starting from Weekday services
@@ -98,23 +128,19 @@ export function analyzeDayTypeCalendar(params: {
 			category = "weekday_only";
 		}
 
-		clusters.push({
-			serviceKey: `${w.baseTrainNo}_${w.originStation}_${w.dest}_${w.destTimeSecs}`,
-			baseTrainNo: w.baseTrainNo,
-			originStation: w.originStation,
-			destStation: w.dest,
-			lineName: w.kaName,
-			routeName: w.routeName,
-			isFakultatif: w.isFakultatif,
-			runsWeekday: true,
-			runsSaturday: runsSa,
-			runsSunday: runsSu,
-			trainIds,
-			relettered,
-			retimed,
-			maxDeltaSecs,
-			category,
-		});
+		clusters.push(
+			buildCluster(
+				w,
+				true,
+				runsSa,
+				runsSu,
+				trainIds,
+				relettered,
+				retimed,
+				maxDeltaSecs,
+				category,
+			),
+		);
 	}
 
 	// Step 2: Unmatched Saturday services
@@ -142,23 +168,19 @@ export function analyzeDayTypeCalendar(params: {
 
 		const category = runsSu ? "weekend_only" : "saturday_only";
 
-		clusters.push({
-			serviceKey: `${sa.baseTrainNo}_${sa.originStation}_${sa.dest}_${sa.destTimeSecs}`,
-			baseTrainNo: sa.baseTrainNo,
-			originStation: sa.originStation,
-			destStation: sa.dest,
-			lineName: sa.kaName,
-			routeName: sa.routeName,
-			isFakultatif: sa.isFakultatif,
-			runsWeekday: false,
-			runsSaturday: true,
-			runsSunday: runsSu,
-			trainIds,
-			relettered,
-			retimed,
-			maxDeltaSecs,
-			category,
-		});
+		clusters.push(
+			buildCluster(
+				sa,
+				false,
+				true,
+				runsSu,
+				trainIds,
+				relettered,
+				retimed,
+				maxDeltaSecs,
+				category,
+			),
+		);
 	}
 
 	// Step 3: Unmatched Sunday services
@@ -166,23 +188,19 @@ export function analyzeDayTypeCalendar(params: {
 		if (matchedSunday.has(su.trainId)) continue;
 		matchedSunday.add(su.trainId);
 
-		clusters.push({
-			serviceKey: `${su.baseTrainNo}_${su.originStation}_${su.dest}_${su.destTimeSecs}`,
-			baseTrainNo: su.baseTrainNo,
-			originStation: su.originStation,
-			destStation: su.dest,
-			lineName: su.kaName,
-			routeName: su.routeName,
-			isFakultatif: su.isFakultatif,
-			runsWeekday: false,
-			runsSaturday: false,
-			runsSunday: true,
-			trainIds: [su.trainId],
-			relettered: false,
-			retimed: false,
-			maxDeltaSecs: 0,
-			category: "sunday_only",
-		});
+		clusters.push(
+			buildCluster(
+				su,
+				false,
+				false,
+				true,
+				[su.trainId],
+				false,
+				false,
+				0,
+				"sunday_only",
+			),
+		);
 	}
 
 	// 7-way Venn breakdown
@@ -479,178 +497,4 @@ export async function loadCalendarData(params: {
 		saturdayTrips: snapData.saturdayTrips,
 		sundayTrips: snapData.sundayTrips,
 	};
-}
-
-/**
- * Formats a terminal-friendly calendar identity and set-difference report.
- */
-export function formatCalendarReport(
-	result: CalendarAnalysisResult,
-	detail = false,
-): string {
-	const { availableDayTypes, totalTripsByDayType, breakdown, stats } = result;
-
-	const dayTypesStr: string[] = [];
-	if (availableDayTypes.weekday) dayTypesStr.push("Weekday");
-	if (availableDayTypes.saturday) dayTypesStr.push("Saturday");
-	if (availableDayTypes.sunday) dayTypesStr.push("Sunday");
-
-	const resolutionStatus =
-		dayTypesStr.length === 3
-			? "Resolved (3/3 day types confirmed)"
-			: `Provisional (${dayTypesStr.length}/3 day types: ${dayTypesStr.join(", ") || "none"})`;
-
-	const formatPct = (count: number) =>
-		result.totalServices > 0
-			? `${((count / result.totalServices) * 100).toFixed(1)}%`
-			: "0.0%";
-
-	const lines: string[] = [];
-	lines.push("── Calendar Schedule Identity Report ────────────────────────");
-	lines.push(
-		`Timetable Version:    ${result.timetableVersion} (source: ${result.source})`,
-	);
-	lines.push(`Calendar Resolution:  ${resolutionStatus}`);
-	lines.push(
-		`Total Unique Services:${result.totalServices.toLocaleString()} distinct operational runs`,
-	);
-	lines.push(
-		`Weekday Departures:   ${availableDayTypes.weekday ? `${totalTripsByDayType.weekday.toLocaleString()} trips` : "N/A"}`,
-	);
-	lines.push(
-		`Saturday Departures:  ${availableDayTypes.saturday ? `${totalTripsByDayType.saturday.toLocaleString()} trips` : "N/A"}`,
-	);
-	lines.push(
-		`Sunday Departures:    ${availableDayTypes.sunday ? `${totalTripsByDayType.sunday.toLocaleString()} trips` : "N/A"}`,
-	);
-	lines.push("");
-
-	lines.push("── 3-Way Set Difference Breakdown ───────────────────────────");
-	lines.push(
-		`  Daily (All 7 Days):     ${String(breakdown.daily.length).padStart(5, " ")} services (${formatPct(breakdown.daily.length).padStart(5, " ")})`,
-	);
-	lines.push(
-		`  Weekday Only:           ${String(breakdown.weekdayOnly.length).padStart(5, " ")} services (${formatPct(breakdown.weekdayOnly.length).padStart(5, " ")})`,
-	);
-	lines.push(
-		`  Weekend Only (Sat+Sun): ${String(breakdown.weekendOnly.length).padStart(5, " ")} services (${formatPct(breakdown.weekendOnly.length).padStart(5, " ")})`,
-	);
-	lines.push(
-		`  Mon - Sat:              ${String(breakdown.monSat.length).padStart(5, " ")} services (${formatPct(breakdown.monSat.length).padStart(5, " ")})`,
-	);
-	lines.push(
-		`  Saturday Only:          ${String(breakdown.saturdayOnly.length).padStart(5, " ")} services (${formatPct(breakdown.saturdayOnly.length).padStart(5, " ")})`,
-	);
-	lines.push(
-		`  Sunday Only:            ${String(breakdown.sundayOnly.length).padStart(5, " ")} services (${formatPct(breakdown.sundayOnly.length).padStart(5, " ")})`,
-	);
-	lines.push(
-		`  Weekday + Sunday:       ${String(breakdown.weekdaySunday.length).padStart(5, " ")} services (${formatPct(breakdown.weekdaySunday.length).padStart(5, " ")})`,
-	);
-	lines.push("");
-
-	lines.push("── Operational Variance Diagnostics ─────────────────────────");
-	lines.push(
-		`  Re-lettered on Weekend: ${stats.reletteredCount} services (e.g. 5022D -> 5022E)`,
-	);
-	lines.push(
-		`  Retimed on Weekend:     ${stats.retimedCount} services (arrival delta within tolerance)`,
-	);
-	lines.push(
-		`  Fakultatif Services:    ${stats.fakultatif.total} total (${stats.fakultatif.weekdayActive} weekday active, ${stats.fakultatif.weekendActive} weekend active, ${stats.fakultatif.suspendedOnWeekend} suspended on weekend)`,
-	);
-	lines.push("─────────────────────────────────────────────────────────────");
-
-	if (detail) {
-		// Group by commercial line name
-		const linesMap = new Map<
-			string,
-			{
-				daily: number;
-				weekdayOnly: number;
-				weekendOnly: number;
-				other: number;
-				total: number;
-			}
-		>();
-
-		const allClusters = [
-			...breakdown.daily,
-			...breakdown.weekdayOnly,
-			...breakdown.weekendOnly,
-			...breakdown.monSat,
-			...breakdown.saturdayOnly,
-			...breakdown.sundayOnly,
-			...breakdown.weekdaySunday,
-		];
-
-		for (const c of allClusters) {
-			const key = c.lineName || "Unassigned";
-			let entry = linesMap.get(key);
-			if (!entry) {
-				entry = {
-					daily: 0,
-					weekdayOnly: 0,
-					weekendOnly: 0,
-					other: 0,
-					total: 0,
-				};
-				linesMap.set(key, entry);
-			}
-			entry.total++;
-			if (c.category === "daily") entry.daily++;
-			else if (c.category === "weekday_only") entry.weekdayOnly++;
-			else if (c.category === "weekend_only") entry.weekendOnly++;
-			else entry.other++;
-		}
-
-		lines.push(
-			"\n── Line-by-Line Service Distribution ───────────────────────",
-		);
-		lines.push(
-			`${"Line Name".padEnd(30, " ")} ${"Daily".padStart(6, " ")} ${"Wkday".padStart(6, " ")} ${"Wkend".padStart(6, " ")} ${"Other".padStart(6, " ")} ${"Total".padStart(6, " ")}`,
-		);
-		lines.push("─".repeat(61));
-		for (const [name, counts] of Array.from(linesMap.entries()).sort(
-			(a, b) => b[1].total - a[1].total,
-		)) {
-			lines.push(
-				`${name.slice(0, 30).padEnd(30, " ")} ${String(counts.daily).padStart(6, " ")} ${String(counts.weekdayOnly).padStart(6, " ")} ${String(counts.weekendOnly).padStart(6, " ")} ${String(counts.other).padStart(6, " ")} ${String(counts.total).padStart(6, " ")}`,
-			);
-		}
-
-		// List re-lettered samples
-		const reletteredClusters = allClusters.filter((c) => c.relettered);
-		if (reletteredClusters.length > 0) {
-			lines.push(
-				"\n── Re-lettered Weekend Services (Sample) ───────────────────",
-			);
-			for (const c of reletteredClusters.slice(0, 8)) {
-				lines.push(
-					`  • ${c.trainIds.join(" -> ")}: ${c.originStation} -> ${c.destStation} (${c.lineName})`,
-				);
-			}
-			if (reletteredClusters.length > 8) {
-				lines.push(`  ... and ${reletteredClusters.length - 8} more`);
-			}
-		}
-
-		// List retimed samples
-		const retimedClusters = allClusters.filter((c) => c.retimed);
-		if (retimedClusters.length > 0) {
-			lines.push(
-				"\n── Retimed Services Across Day Types (Sample) ───────────────",
-			);
-			for (const c of retimedClusters.slice(0, 8)) {
-				lines.push(
-					`  • ${c.trainIds.join(", ")} (${c.destStation}): max delta ±${c.maxDeltaSecs}s`,
-				);
-			}
-			if (retimedClusters.length > 8) {
-				lines.push(`  ... and ${retimedClusters.length - 8} more`);
-			}
-		}
-	}
-
-	return lines.join("\n");
 }

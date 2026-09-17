@@ -35,10 +35,17 @@ export interface ExecuteDetectOptions {
 	cwd?: string;
 }
 
+export const DRIFT_THRESHOLDS = {
+	maxRelettered: 5,
+	minCongruenceRatio: 0.85,
+	maxAdded: 5,
+	maxWithdrawn: 10,
+} as const;
+
 const STATION_NAMES: Record<string, string> = {
-	MRI: "Manggarai (Central Trunk)",
-	BKS: "Bekasi (Eastern Corridor)",
-	RK: "Rangkasbitung (Western Branch)",
+	[CORRIDOR_REFERENCE_STATIONS.manggarai]: "Manggarai (Central Trunk)",
+	[CORRIDOR_REFERENCE_STATIONS.bekasi]: "Bekasi (Eastern Corridor)",
+	[CORRIDOR_REFERENCE_STATIONS.rangkasbitung]: "Rangkasbitung (Western Branch)",
 };
 
 /**
@@ -242,10 +249,10 @@ export async function executeDetect(
 	let actionRecommendation: string | undefined;
 
 	if (
-		totalRelettered > 5 ||
-		congruenceRatio < 0.85 ||
-		totalAdded > 5 ||
-		totalWithdrawn > 10
+		totalRelettered > DRIFT_THRESHOLDS.maxRelettered ||
+		congruenceRatio < DRIFT_THRESHOLDS.minCongruenceRatio ||
+		totalAdded > DRIFT_THRESHOLDS.maxAdded ||
+		totalWithdrawn > DRIFT_THRESHOLDS.maxWithdrawn
 	) {
 		status = "POTENTIAL_EDITION_DRIFT";
 		actionRecommendation = `KCI appears to have revised timetable editions. Run 'krl capture --new-version' to bootstrap timetable version ${timetableVersion + 1}.`;
@@ -300,55 +307,4 @@ export async function executeDetect(
 		summary,
 		actionRecommendation,
 	};
-}
-
-/**
- * Pretty-prints a clean terminal report for corridor drift detection.
- */
-export function formatDetectReport(result: DetectResult): string {
-	const lines: string[] = [];
-	lines.push("── Operational Corridor Drift Probe (§9, §12) ──────────────");
-	lines.push(`Probe Timestamp:      ${result.probeTimeWib}`);
-	lines.push(
-		`Timetable Version:    ${result.timetableVersion} (baseline source: ${result.baselineSource})`,
-	);
-	lines.push(`Target Day Type:      ${result.dayType} (${result.dateStr})`);
-	lines.push(
-		`Corridor Signature:   ${result.stations.length} hub stations (${result.stations.map((s) => s.stationId).join(", ")})`,
-	);
-	lines.push("");
-
-	lines.push("── Station Departure Results ────────────────────────────────");
-	for (const s of result.stations) {
-		const idTag = `[${s.stationId}]`.padEnd(5, " ");
-		const name = s.stationName.slice(0, 20).padEnd(20, " ");
-		const counts = `${String(s.expectedCount).padStart(3, " ")} exp, ${String(s.liveCount).padStart(3, " ")} live`;
-		const diffs = `(${String(s.identicalCount).padStart(3, " ")} id, ${s.reletteredCount} re-let, ${s.retimedCount} retimed, ${s.addedCount} add, ${s.withdrawnCount} del)`;
-		lines.push(`  ${idTag} ${name} : ${counts} ${diffs}`);
-	}
-	lines.push("");
-
-	lines.push("── Overall Corridor Status ──────────────────────────────────");
-	const statusEmoji =
-		result.status === "STABLE"
-			? "STABLE (Congruent) ✅"
-			: result.status === "OPERATIONAL_VARIANCE"
-				? "OPERATIONAL VARIANCE (Minor Drift) ℹ️"
-				: "POTENTIAL TIMETABLE EDITION DRIFT ⚠️";
-	lines.push(`Status:               ${statusEmoji}`);
-	lines.push(
-		`Congruent Departures: ${result.totalIdentical} / ${result.totalExpected} (${result.totalExpected > 0 ? ((result.totalIdentical / result.totalExpected) * 100).toFixed(1) : 0}%)`,
-	);
-	lines.push(`Re-lettered Services: ${result.totalRelettered}`);
-	lines.push(`Retimed Services:     ${result.totalRetimed}`);
-	lines.push(`Unexpected Added:     ${result.totalAdded}`);
-	lines.push(`Missing / Cancelled:  ${result.totalWithdrawn}`);
-
-	if (result.actionRecommendation) {
-		lines.push("");
-		lines.push(`Action Recommended:   ${result.actionRecommendation}`);
-	}
-	lines.push("─────────────────────────────────────────────────────────────");
-
-	return lines.join("\n");
 }
