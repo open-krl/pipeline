@@ -641,7 +641,7 @@ export async function executeCapture(
 	const gate1 = await evaluateGate1({
 		dataDir: ctx.dataDir,
 		currentStationMasterHash,
-		currentStations: operationalStations,
+		currentStations: stationsResponse.data,
 		newVersion: ctx.newVersion,
 		yes: ctx.yes,
 		prompt: ctx.prompt,
