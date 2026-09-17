@@ -13,78 +13,15 @@ import {
 	scanTimetableVersions,
 } from "../archive/snapshots";
 import { resolveSafePath } from "../core/path";
-import { extractTripSummaries, type TripSummary } from "./fingerprint";
+import {
+	extractTripSummaries,
+	findBestFingerprintCandidate,
+	type TripSummary,
+} from "./fingerprint";
 import type { CalendarAnalysisResult, CalendarServiceCluster } from "./types";
 
 export interface MatchCalendarOptions {
 	toleranceSecs?: number;
-}
-
-/**
- * Finds a matching trip from candidates using direct ID or Domain Fingerprint (§4.1, Invariant 8):
- * Fingerprint = (base_train_no, origin_station, dest_station, arrival_secs ± tolerance)
- */
-function findMatchingCandidate(
-	target: TripSummary,
-	candidates: Map<string, TripSummary>,
-	matchedIds: Set<string>,
-	tolerance: number,
-): {
-	match: TripSummary;
-	relettered: boolean;
-	retimed: boolean;
-	deltaSecs: number;
-} | null {
-	// 1. Direct match on identical train_id
-	const direct = candidates.get(target.trainId);
-	if (direct && !matchedIds.has(direct.trainId)) {
-		if (direct.dest === target.dest) {
-			const delta = Math.abs(direct.destTimeSecs - target.destTimeSecs);
-			if (delta <= tolerance) {
-				return {
-					match: direct,
-					relettered: false,
-					retimed: delta > 0,
-					deltaSecs: delta,
-				};
-			}
-		}
-	}
-
-	// 2. Domain Fingerprint matching
-	let bestCandidate: TripSummary | null = null;
-	let minDelta = Number.POSITIVE_INFINITY;
-
-	for (const candidate of candidates.values()) {
-		if (matchedIds.has(candidate.trainId)) continue;
-		if (candidate.baseTrainNo !== target.baseTrainNo) continue;
-		if (candidate.dest !== target.dest) continue;
-
-		if (
-			candidate.originStation !== "UNKNOWN" &&
-			target.originStation !== "UNKNOWN" &&
-			candidate.originStation !== target.originStation
-		) {
-			continue;
-		}
-
-		const delta = Math.abs(candidate.destTimeSecs - target.destTimeSecs);
-		if (delta <= tolerance && delta < minDelta) {
-			minDelta = delta;
-			bestCandidate = candidate;
-		}
-	}
-
-	if (bestCandidate) {
-		return {
-			match: bestCandidate,
-			relettered: bestCandidate.trainId !== target.trainId,
-			retimed: minDelta > 0,
-			deltaSecs: minDelta,
-		};
-	}
-
-	return null;
 }
 
 /**
@@ -121,12 +58,12 @@ export function analyzeDayTypeCalendar(params: {
 		matchedWeekday.add(w.trainId);
 
 		const saMatch = hasSaturday
-			? findMatchingCandidate(w, saTrips, matchedSaturday, tolerance)
+			? findBestFingerprintCandidate(w, saTrips, matchedSaturday, tolerance)
 			: null;
 		if (saMatch) matchedSaturday.add(saMatch.match.trainId);
 
 		const suMatch = hasSunday
-			? findMatchingCandidate(w, suTrips, matchedSunday, tolerance)
+			? findBestFingerprintCandidate(w, suTrips, matchedSunday, tolerance)
 			: null;
 		if (suMatch) matchedSunday.add(suMatch.match.trainId);
 
@@ -188,7 +125,7 @@ export function analyzeDayTypeCalendar(params: {
 		matchedSaturday.add(sa.trainId);
 
 		const suMatch = hasSunday
-			? findMatchingCandidate(sa, suTrips, matchedSunday, tolerance)
+			? findBestFingerprintCandidate(sa, suTrips, matchedSunday, tolerance)
 			: null;
 		if (suMatch) matchedSunday.add(suMatch.match.trainId);
 

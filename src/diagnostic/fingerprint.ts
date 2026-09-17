@@ -20,6 +20,11 @@ export interface TripSummary {
 	dest: string;
 	destTime: string;
 	destTimeSecs: number;
+	/**
+	 * Station ID of the chronologically earliest departure stop across observed boards.
+	 * NOTE: Represents the physical origin only under the invariant that boards cover the
+	 * complete 24h service day (§2.2).
+	 */
 	originStation: string;
 	originDepSecs: number;
 	departures: Map<string, TripDepartureStop>;
@@ -144,6 +149,88 @@ export interface MatchedTripsResult {
  * Matches trips across two captures using the Railway Fingerprint model (§4.1, Invariant 8):
  * Fingerprint = (base_train_no, origin_station, dest_station, arrival_time ± tolerance)
  */
+export interface CandidateMatchResult {
+	match: TripSummary;
+	relettered: boolean;
+	retimed: boolean;
+	deltaSecs: number;
+}
+
+/**
+ * Finds the optimal candidate trip matching a target trip by exact ID or Railway Fingerprint (§4.1, Invariant 8).
+ * Selects candidate with minimum destination arrival time delta within tolerance.
+ */
+export function findBestFingerprintCandidate(
+	target: TripSummary,
+	candidates: Map<string, TripSummary> | Iterable<TripSummary>,
+	matchedIds: Set<string>,
+	tolerance = 900,
+): CandidateMatchResult | null {
+	const candidateList =
+		candidates instanceof Map
+			? Array.from(candidates.values())
+			: Array.from(candidates);
+
+	// 1. Direct match on identical train_id
+	for (const candidate of candidateList) {
+		if (
+			candidate.trainId === target.trainId &&
+			!matchedIds.has(candidate.trainId)
+		) {
+			if (candidate.dest === target.dest) {
+				const delta = Math.abs(candidate.destTimeSecs - target.destTimeSecs);
+				if (delta <= tolerance) {
+					return {
+						match: candidate,
+						relettered: false,
+						retimed: delta > 0,
+						deltaSecs: delta,
+					};
+				}
+			}
+		}
+	}
+
+	// 2. Domain Fingerprint matching: same base_train_no, origin, dest, min arrival delta
+	let bestCandidate: TripSummary | null = null;
+	let minDelta = Number.POSITIVE_INFINITY;
+
+	for (const candidate of candidateList) {
+		if (matchedIds.has(candidate.trainId)) continue;
+		if (candidate.baseTrainNo !== target.baseTrainNo) continue;
+		if (candidate.dest !== target.dest) continue;
+
+		if (
+			candidate.originStation !== "UNKNOWN" &&
+			target.originStation !== "UNKNOWN" &&
+			candidate.originStation !== target.originStation
+		) {
+			continue;
+		}
+
+		const delta = Math.abs(candidate.destTimeSecs - target.destTimeSecs);
+		if (delta <= tolerance && delta < minDelta) {
+			minDelta = delta;
+			bestCandidate = candidate;
+		}
+	}
+
+	if (bestCandidate) {
+		return {
+			match: bestCandidate,
+			relettered: bestCandidate.trainId !== target.trainId,
+			retimed: minDelta > 0,
+			deltaSecs: minDelta,
+		};
+	}
+
+	return null;
+}
+
+/**
+ * Matches trips across two captures using the Railway Fingerprint model (§4.1, Invariant 8):
+ * Fingerprint = (base_train_no, origin_station, dest_station, arrival_time ± tolerance)
+ */
 export function matchTripsByFingerprint(
 	tripsBefore: Map<string, TripSummary>,
 	tripsAfter: Map<string, TripSummary>,
@@ -215,7 +302,7 @@ export function matchTripsByFingerprint(
 	}
 
 	// Pass 2: Fingerprint matching for remaining unmatched trips (§4.1)
-	// Match on: base_train_no, dest, origin, and arrival_time within tolerance
+	// Match on: base_train_no, dest, origin, and arrival_time within tolerance (best min-delta match)
 	const remainingBefore = Array.from(tripsBefore.values()).filter(
 		(t) => !matchedBeforeIds.has(t.trainId),
 	);
@@ -224,17 +311,31 @@ export function matchTripsByFingerprint(
 	);
 
 	for (const afterTrip of remainingAfter) {
-		const candidateIndex = remainingBefore.findIndex(
-			(beforeTrip) =>
+		let bestIndex = -1;
+		let minDelta = Number.POSITIVE_INFINITY;
+
+		for (let i = 0; i < remainingBefore.length; i++) {
+			const beforeTrip = remainingBefore[i];
+			if (
 				beforeTrip.baseTrainNo === afterTrip.baseTrainNo &&
 				beforeTrip.dest === afterTrip.dest &&
-				beforeTrip.originStation === afterTrip.originStation &&
-				Math.abs(beforeTrip.destTimeSecs - afterTrip.destTimeSecs) <= tolerance,
-		);
+				(beforeTrip.originStation === "UNKNOWN" ||
+					afterTrip.originStation === "UNKNOWN" ||
+					beforeTrip.originStation === afterTrip.originStation)
+			) {
+				const delta = Math.abs(
+					beforeTrip.destTimeSecs - afterTrip.destTimeSecs,
+				);
+				if (delta <= tolerance && delta < minDelta) {
+					minDelta = delta;
+					bestIndex = i;
+				}
+			}
+		}
 
-		if (candidateIndex >= 0) {
-			const beforeTrip = remainingBefore[candidateIndex];
-			remainingBefore.splice(candidateIndex, 1);
+		if (bestIndex >= 0) {
+			const beforeTrip = remainingBefore[bestIndex];
+			remainingBefore.splice(bestIndex, 1);
 			matchedAfterIds.add(afterTrip.trainId);
 
 			const destDeltaSecs = afterTrip.destTimeSecs - beforeTrip.destTimeSecs;
@@ -296,7 +397,8 @@ export function matchTripsByFingerprint(
 		});
 	}
 
-	// Deterministic sorting
+	// Deterministic sorting across all result arrays
+	identical.sort((a, b) => a.baseTrainNo - b.baseTrainNo);
 	relettered.sort((a, b) => a.baseTrainNo - b.baseTrainNo);
 	retimed.sort((a, b) => a.baseTrainNo - b.baseTrainNo);
 	added.sort((a, b) => a.baseTrainNo - b.baseTrainNo);

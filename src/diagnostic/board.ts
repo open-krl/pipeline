@@ -77,7 +77,15 @@ export function diffDepartureBoards(
 	// Format concise summary
 	const parts: string[] = [];
 	if (matchResult.relettered.length > 0) {
-		parts.push(`${matchResult.relettered.length} re-lettered`);
+		const pureCount = matchResult.relettered.filter(
+			(r) => r.classification === "relettered",
+		).length;
+		const retimedCount = matchResult.relettered.length - pureCount;
+		parts.push(
+			retimedCount > 0
+				? `${matchResult.relettered.length} re-lettered (${pureCount} pure, ${retimedCount} retimed)`
+				: `${matchResult.relettered.length} re-lettered`,
+		);
 	}
 	if (matchResult.retimed.length > 0) {
 		parts.push(`${matchResult.retimed.length} retimed`);
