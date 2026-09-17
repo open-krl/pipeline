@@ -1,4 +1,4 @@
-// tests/commands/census.test.ts
+// tests/census/census.test.ts
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -15,12 +15,12 @@ import {
 	runStratifiedSpotCheck,
 	selectStratifiedSample,
 	writeItineraryEnvelope,
-} from "../../src/commands/census";
+} from "../../src/census";
 import { payloadHash } from "../../src/core/canonical";
 
 const TEST_SCRATCH_DIR = path.resolve(process.cwd(), "scratch/test_census_env");
 
-describe("src/commands/census", () => {
+describe("src/census/census", () => {
 	beforeEach(async () => {
 		await fs.rm(TEST_SCRATCH_DIR, { recursive: true, force: true });
 		await fs.mkdir(TEST_SCRATCH_DIR, { recursive: true });

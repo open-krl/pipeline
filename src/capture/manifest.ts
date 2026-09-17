@@ -1,6 +1,6 @@
-// src/core/manifest.ts
+// src/capture/manifest.ts
 import type { DepartureBoardItem, StationItem } from "../api/schemas";
-import { canonicalSerialize, payloadHash, sha256 } from "./canonical";
+import { canonicalSerialize, payloadHash, sha256 } from "../core/canonical";
 
 /**
  * Computes canonical hash for the active station master catalog (§8.1, §8.2).

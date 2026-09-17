@@ -1,20 +1,17 @@
-// tests/commands/snapshots.test.ts
+// tests/capture/snapshots.test.ts
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { CaptureManifest } from "../../src/api/schemas";
-import {
-	formatSnapshotTable,
-	getSnapshotList,
-} from "../../src/commands/snapshots";
+import { formatSnapshotTable, getSnapshotList } from "../../src/capture";
 
 const TEST_DATA_DIR = path.resolve(
 	process.cwd(),
 	"scratch/test_snapshots_list_env",
 );
 
-describe("src/commands/snapshots", () => {
+describe("src/capture/snapshots", () => {
 	beforeEach(async () => {
 		await fs.rm(TEST_DATA_DIR, { recursive: true, force: true });
 		await fs.mkdir(TEST_DATA_DIR, { recursive: true });

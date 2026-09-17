@@ -1,4 +1,4 @@
-// src/commands/census.ts
+// src/census/census.ts
 import type { Dirent } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -11,6 +11,7 @@ import {
 	type MultiObservationItinerary,
 	MultiObservationItinerarySchema,
 } from "../api/schemas";
+import { scanSnapshots, scanTimetableVersions } from "../capture";
 import { payloadHash } from "../core/canonical";
 import { type CommitCensusResult, commitCensus } from "../core/git";
 import {
@@ -19,7 +20,6 @@ import {
 	startTimer,
 } from "../core/logger";
 import { resolveSafePath } from "../core/path";
-import { scanSnapshots, scanTimetableVersions } from "./capture";
 
 export interface DiscoveredTrain {
 	trainId: string;

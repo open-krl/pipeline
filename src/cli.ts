@@ -6,11 +6,12 @@ import { cac } from "cac";
 import { type DayType, DayTypeSchema } from "./api/schemas";
 import {
 	executeCapture,
+	formatSnapshotTable,
+	getSnapshotList,
 	scanSnapshots,
 	scanTimetableVersions,
-} from "./commands/capture";
-import { executeCensus } from "./commands/census";
-import { formatSnapshotTable, getSnapshotList } from "./commands/snapshots";
+} from "./capture";
+import { executeCensus } from "./census";
 import { type RegionScope, RegionScopeSchema } from "./config";
 import { commitCaptureSnapshot } from "./core/git";
 import { resolveSafePath } from "./core/path";

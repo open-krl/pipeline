@@ -1,4 +1,4 @@
-// src/commands/capture.ts
+// src/capture/capture.ts
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { stdin as input, stdout as output } from "node:process";
@@ -26,12 +26,9 @@ import {
 	StructuredLogger,
 	startTimer,
 } from "../core/logger";
-import {
-	computeBoardResponseHash,
-	computeStationMasterHash,
-} from "../core/manifest";
 import { resolveSafePath } from "../core/path";
 import { loadHolidays } from "../db/holidays";
+import { computeBoardResponseHash, computeStationMasterHash } from "./manifest";
 
 export interface CaptureOptions {
 	client?: KciClient;

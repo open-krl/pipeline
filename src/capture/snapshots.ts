@@ -1,4 +1,4 @@
-// src/commands/snapshots.ts
+// src/capture/snapshots.ts
 import { execFile } from "node:child_process";
 import * as path from "node:path";
 import { promisify } from "node:util";

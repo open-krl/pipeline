@@ -1,4 +1,4 @@
-// tests/commands/capture.test.ts
+// tests/capture/capture.test.ts
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -7,14 +7,14 @@ import type {
 	DepartureBoardResponse,
 	StationMasterResponse,
 } from "../../src/api/schemas";
-import { executeCapture } from "../../src/commands/capture";
+import { executeCapture } from "../../src/capture";
 
 const TEST_SCRATCH_DIR = path.resolve(
 	process.cwd(),
 	"scratch/test_capture_env",
 );
 
-describe("src/commands/capture", () => {
+describe("src/capture/capture", () => {
 	beforeEach(async () => {
 		await fs.rm(TEST_SCRATCH_DIR, { recursive: true, force: true });
 		await fs.mkdir(TEST_SCRATCH_DIR, { recursive: true });
