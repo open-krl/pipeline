@@ -38,6 +38,7 @@ describe("Diagnostic Baseline Resolver (§9, §12)", () => {
 
 	it("resolves explicit dbPath and throws on missing db", async () => {
 		const scratchDb = "scratch/test_explicit_baseline.db";
+		await fs.mkdir(path.dirname(scratchDb), { recursive: true });
 		const db = new Database(scratchDb);
 		db.run(`
 			CREATE TABLE trips (
@@ -54,7 +55,7 @@ describe("Diagnostic Baseline Resolver (§9, §12)", () => {
 			expect(resolved.source).toBe("database");
 			expect(resolved.version).toBe(3);
 
-			expect(
+			await expect(
 				resolveDiagnosticBaseline({ dbPath: "scratch/missing_db.db" }),
 			).rejects.toThrow("Baseline database file not found");
 		} finally {
@@ -63,7 +64,7 @@ describe("Diagnostic Baseline Resolver (§9, §12)", () => {
 	});
 
 	it("throws explicit error when raw dataDir does not exist", async () => {
-		expect(
+		await expect(
 			resolveDiagnosticBaseline({ dataDir: "scratch/missing_raw_dir" }),
 		).rejects.toThrow("Baseline raw data directory not found");
 	});
