@@ -85,12 +85,13 @@ export async function resolveDiagnosticBaseline(
 			try {
 				const row = db
 					.query<{ timetable_version: number }, []>(
-						"SELECT DISTINCT timetable_version FROM trips LIMIT 1",
+						"SELECT timetable_version FROM trips ORDER BY timetable_version DESC LIMIT 1",
 					)
 					.get();
-				version = row?.timetable_version ?? 1;
-			} catch {
-				version = 1;
+				if (!row) {
+					throw new Error(`Baseline database contains no trips: ${resolvedDb}`);
+				}
+				version = row.timetable_version;
 			} finally {
 				db.close();
 			}
@@ -121,14 +122,18 @@ export async function resolveDiagnosticBaseline(
 		}
 
 		let version = options.version;
+		const versions = await scanTimetableVersions(resolvedRawDir);
 		if (version === undefined) {
-			const versions = await scanTimetableVersions(resolvedRawDir);
 			if (versions.length === 0) {
 				throw new Error(
 					`No timetable versions found in raw data directory: ${resolvedRawDir}`,
 				);
 			}
 			version = versions[versions.length - 1];
+		} else if (!versions.includes(version)) {
+			throw new Error(
+				`Timetable version ${version} not found in raw data directory: ${resolvedRawDir}`,
+			);
 		}
 
 		return {

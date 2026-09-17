@@ -290,7 +290,7 @@ export async function loadCalendarFromDatabase(
 		if (v === undefined) {
 			const vRow = db
 				.query<{ timetable_version: number }, []>(
-					"SELECT DISTINCT timetable_version FROM trips LIMIT 1",
+					"SELECT timetable_version FROM trips ORDER BY timetable_version DESC LIMIT 1",
 				)
 				.get();
 			if (!vRow) throw new Error(`Database at ${dbPath} contains no trips.`);

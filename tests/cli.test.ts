@@ -224,6 +224,9 @@ describe("src/cli — CAC architecture", () => {
 				"data/build/krl_v1.db",
 				"--data-dir",
 				"data/raw",
+				"--raw",
+				"--stations",
+				"MRI,BKS",
 				"--holidays-path",
 				"data/holidays.json",
 				"--tolerance",
@@ -240,6 +243,8 @@ describe("src/cli — CAC architecture", () => {
 		expect(parsed.options.dayType).toBe("weekday");
 		expect(parsed.options.dbPath).toBe("data/build/krl_v1.db");
 		expect(parsed.options.dataDir).toBe("data/raw");
+		expect(parsed.options.raw).toBe(true);
+		expect(parsed.options.stations).toBe("MRI,BKS");
 		expect(parsed.options.holidaysPath).toBe("data/holidays.json");
 		expect(parsed.options.tolerance).toBe(900);
 		expect(parsed.options.failOnDrift).toBe(true);

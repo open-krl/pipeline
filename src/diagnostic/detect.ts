@@ -32,6 +32,7 @@ export interface ExecuteDetectOptions {
 	holidaysPath?: string;
 	stations?: string[];
 	toleranceSecs?: number;
+	preferSource?: "database" | "snapshots";
 	cwd?: string;
 }
 
@@ -134,7 +135,7 @@ export async function executeDetect(
 		dataDir: options.dataDir,
 		dbPath: options.dbPath,
 		cwd,
-		preferSource: "database",
+		preferSource: options.preferSource ?? "database",
 	});
 
 	const timetableVersion = baseline.version;

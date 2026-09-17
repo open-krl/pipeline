@@ -723,9 +723,12 @@ Export Time:        ${result.durationSecs}s
 			"Explicit day type override (weekday, saturday, sunday, holiday)",
 		)
 		.option("--db-path <path>", "Override SQLite database path")
-		.option("--data-dir <path>", "Override raw data root directory", {
-			default: "data/raw",
-		})
+		.option("--raw", "Use raw snapshot captures instead of compiled database")
+		.option("--data-dir <path>", "Override raw data root directory")
+		.option(
+			"--stations <codes>",
+			"Comma-separated station codes to probe (e.g. MRI,BKS,RK)",
+		)
 		.option("--holidays-path <path>", "Override holidays file path", {
 			default: "data/holidays.json",
 		})
@@ -745,7 +748,9 @@ Export Time:        ${result.durationSecs}s
 					date?: string;
 					dayType?: string;
 					dbPath?: string;
+					raw?: boolean;
 					dataDir?: string;
+					stations?: string;
 					holidaysPath?: string;
 					tolerance?: string | number;
 					failOnDrift?: boolean;
@@ -806,6 +811,13 @@ Export Time:        ${result.durationSecs}s
 					tolerance = parsedTol;
 				}
 
+				const targetStations = options.stations
+					? options.stations
+							.split(",")
+							.map((s) => s.trim().toUpperCase())
+							.filter(Boolean)
+					: undefined;
+
 				try {
 					const result = await executeDetect({
 						version,
@@ -813,6 +825,8 @@ Export Time:        ${result.durationSecs}s
 						dayType,
 						dbPath: options.dbPath,
 						dataDir: options.dataDir,
+						preferSource: options.raw ? "snapshots" : "database",
+						stations: targetStations,
 						holidaysPath: options.holidaysPath,
 						toleranceSecs: tolerance,
 					});
