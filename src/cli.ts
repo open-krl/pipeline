@@ -11,6 +11,13 @@ import { formatSnapshotTable, getSnapshotList } from "./capture/snapshots";
 import { executeCensus } from "./census/census";
 import { type RegionScope, RegionScopeSchema } from "./config";
 import { resolveSafePath } from "./core/path";
+import {
+	analyzeDayTypeCalendar,
+	loadCalendarData,
+} from "./diagnostic/calendar";
+import { executeDiff } from "./diagnostic/cli-diff";
+import { executeDetect } from "./diagnostic/detect";
+import { formatCalendarReport, formatDetectReport } from "./diagnostic/format";
 import { executeExport } from "./export/export";
 
 export function createCli() {
@@ -566,25 +573,290 @@ Export Time:        ${result.durationSecs}s
 			},
 		);
 
-	// 7. Future milestones
-	const upcomingCommands = [
-		{
-			name: "calendar",
-			desc: "Inspect three-way day-type set differences & schedule identity report (§9)",
-		},
-		{
-			name: "detect",
-			desc: "Probe corridor hubs for timetable drift (§12)",
-		},
-	];
+	// 6. diff
+	cli
+		.command(
+			"diff [...snapshots]",
+			"Diff station catalogs, departure boards, or train itineraries (§8.1, §9)",
+		)
+		.option("--data-dir <path>", "Override raw data root directory", {
+			default: "data/raw",
+		})
+		.option("--v1 <version>", "First timetable version to compare")
+		.option("--v2 <version>", "Second timetable version to compare")
+		.option(
+			"--train <trainIds...>",
+			"Trip IDs to diff itineraries (e.g. --train 5022D 5022E)",
+		)
+		.option("--day-type <type>", "Target day type for itinerary comparison")
+		.option(
+			"--detail",
+			"Display full station-by-station and stop-by-stop listings",
+		)
+		.action(async (...actionArgs: unknown[]) => {
+			const options = (actionArgs[actionArgs.length - 1] ?? {}) as {
+				dataDir?: string;
+				v1?: number | string;
+				v2?: number | string;
+				train?: string | string[];
+				dayType?: string;
+				detail?: boolean;
+			};
+			const rawSnapshots = actionArgs.slice(0, -1);
+			const args: string[] = [];
+			for (const a of rawSnapshots) {
+				if (Array.isArray(a)) {
+					for (const item of a) {
+						if (typeof item === "string") args.push(item);
+					}
+				} else if (typeof a === "string") {
+					args.push(a);
+				}
+			}
 
-	for (const { name, desc } of upcomingCommands) {
-		cli.command(name, desc).action(() => {
-			console.log(
-				`Command '${name}' will be implemented in upcoming milestone.`,
-			);
+			try {
+				await executeDiff(args, options);
+			} catch (err) {
+				console.error(
+					`Diff failed: ${err instanceof Error ? err.message : String(err)}`,
+				);
+				process.exit(1);
+			}
 		});
-	}
+
+	// 7. calendar
+	cli
+		.command(
+			"calendar [version]",
+			"Inspect three-way day-type set differences & schedule identity report (§9)",
+		)
+		.option("--data-dir <path>", "Override raw data root directory", {
+			default: "data/raw",
+		})
+		.option("--db-path <path>", "Override SQLite database path")
+		.option(
+			"--tolerance <seconds>",
+			"Arrival matching tolerance in seconds (default: 900)",
+		)
+		.option(
+			"--detail",
+			"Show detailed line-by-line breakdown and sample services",
+		)
+		.option("--json", "Emit structured JSON output")
+		.action(
+			async (
+				versionArg: string | undefined,
+				options: {
+					dataDir?: string;
+					dbPath?: string;
+					tolerance?: string | number;
+					detail?: boolean;
+					json?: boolean;
+				},
+			) => {
+				let version: number | undefined;
+				if (versionArg !== undefined) {
+					const trimmed = versionArg.trim();
+					const parsed = Number.parseInt(trimmed, 10);
+					if (
+						!/^\d+$/.test(trimmed) ||
+						!Number.isSafeInteger(parsed) ||
+						parsed <= 0
+					) {
+						console.error(
+							`Error: Invalid version number '${versionArg}'. Must be a positive integer.`,
+						);
+						process.exit(1);
+					}
+					version = parsed;
+				}
+
+				let tolerance: number | undefined;
+				if (options.tolerance !== undefined) {
+					const parsedTol = Number(options.tolerance);
+					if (!Number.isFinite(parsedTol) || parsedTol < 0) {
+						console.error("Error: --tolerance must be a non-negative number.");
+						process.exit(1);
+					}
+					tolerance = parsedTol;
+				}
+
+				try {
+					const data = await loadCalendarData({
+						version,
+						dataDir: options.dataDir,
+						dbPath: options.dbPath,
+					});
+
+					const result = analyzeDayTypeCalendar({
+						timetableVersion: data.version,
+						source: data.source,
+						weekdayTrips: data.weekdayTrips,
+						saturdayTrips: data.saturdayTrips,
+						sundayTrips: data.sundayTrips,
+						options: { toleranceSecs: tolerance },
+					});
+
+					if (options.json) {
+						console.log(JSON.stringify(result, null, 2));
+					} else {
+						console.log(formatCalendarReport(result, options.detail));
+					}
+				} catch (err) {
+					console.error(
+						`Calendar analysis failed: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+			},
+		);
+
+	// 8. detect
+	cli
+		.command(
+			"detect [version]",
+			"Probe corridor hub departure boards for timetable drift (§9, §12)",
+		)
+		.option("--date <YYYY-MM-DD>", "Target date for day-type resolution")
+		.option(
+			"--day-type <type>",
+			"Explicit day type override (weekday, saturday, sunday, holiday)",
+		)
+		.option("--db-path <path>", "Override SQLite database path")
+		.option("--raw", "Use raw snapshot captures instead of compiled database")
+		.option("--data-dir <path>", "Override raw data root directory")
+		.option(
+			"--stations <codes>",
+			"Comma-separated station codes to probe (e.g. MRI,BKS,RK)",
+		)
+		.option("--holidays-path <path>", "Override holidays file path", {
+			default: "data/holidays.json",
+		})
+		.option(
+			"--tolerance <seconds>",
+			"Arrival matching tolerance in seconds (default: 900)",
+		)
+		.option(
+			"--fail-on-drift",
+			"Exit with code 1 if potential timetable edition drift is detected",
+		)
+		.option("--json", "Emit structured JSON output")
+		.action(
+			async (
+				versionArg: string | undefined,
+				options: {
+					date?: string;
+					dayType?: string;
+					dbPath?: string;
+					raw?: boolean;
+					dataDir?: string;
+					stations?: string;
+					holidaysPath?: string;
+					tolerance?: string | number;
+					failOnDrift?: boolean;
+					json?: boolean;
+				},
+			) => {
+				let version: number | undefined;
+				if (versionArg !== undefined) {
+					const trimmed = versionArg.trim();
+					const parsed = Number.parseInt(trimmed, 10);
+					if (
+						!/^\d+$/.test(trimmed) ||
+						!Number.isSafeInteger(parsed) ||
+						parsed <= 0
+					) {
+						console.error(
+							`Error: Invalid version number '${versionArg}'. Must be a positive integer.`,
+						);
+						process.exit(1);
+					}
+					version = parsed;
+				}
+
+				let parsedDate: Date | undefined;
+				if (options.date !== undefined) {
+					if (!/^\d{4}-\d{2}-\d{2}$/.test(options.date)) {
+						console.error(
+							`Error: Invalid date format '${options.date}'. Expected YYYY-MM-DD.`,
+						);
+						process.exit(1);
+					}
+					const [y, m, d] = options.date.split("-").map(Number);
+					parsedDate = new Date(`${options.date}T00:00:00+07:00`);
+					if (
+						Number.isNaN(parsedDate.getTime()) ||
+						parsedDate.getFullYear() !== y ||
+						parsedDate.getMonth() + 1 !== m ||
+						parsedDate.getDate() !== d
+					) {
+						console.error(`Error: Invalid calendar date '${options.date}'.`);
+						process.exit(1);
+					}
+				}
+
+				let dayType: DayType | undefined;
+				if (options.dayType !== undefined) {
+					const parsedDayType = DayTypeSchema.safeParse(options.dayType);
+					if (!parsedDayType.success) {
+						console.error(
+							`Error: Invalid day type '${options.dayType}'. Must be weekday, saturday, sunday, or holiday.`,
+						);
+						process.exit(1);
+					}
+					dayType = parsedDayType.data;
+				}
+
+				let tolerance: number | undefined;
+				if (options.tolerance !== undefined) {
+					const parsedTol = Number(options.tolerance);
+					if (!Number.isFinite(parsedTol) || parsedTol < 0) {
+						console.error("Error: --tolerance must be a non-negative number.");
+						process.exit(1);
+					}
+					tolerance = parsedTol;
+				}
+
+				const targetStations = options.stations
+					? options.stations
+							.split(",")
+							.map((s) => s.trim().toUpperCase())
+							.filter(Boolean)
+					: undefined;
+
+				try {
+					const result = await executeDetect({
+						version,
+						date: parsedDate,
+						dayType,
+						dbPath: options.dbPath,
+						dataDir: options.dataDir,
+						preferSource: options.raw ? "snapshots" : "database",
+						stations: targetStations,
+						holidaysPath: options.holidaysPath,
+						toleranceSecs: tolerance,
+					});
+
+					if (options.json) {
+						console.log(JSON.stringify(result, null, 2));
+					} else {
+						console.log(formatDetectReport(result));
+					}
+
+					if (
+						options.failOnDrift &&
+						result.status === "POTENTIAL_EDITION_DRIFT"
+					) {
+						process.exit(1);
+					}
+				} catch (err) {
+					console.error(
+						`Drift detection failed: ${err instanceof Error ? err.message : String(err)}`,
+					);
+					process.exit(1);
+				}
+			},
+		);
 
 	cli.help();
 	cli.version("0.1.0");

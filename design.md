@@ -156,8 +156,9 @@ Operational train identifiers are composed of a structural base number and opera
 
 **Rules of Identity:**
 1. **Base Number as Identity:** The base number represents the persistent identity of the service path. Suffix letters represent operational iterations or timetable revisions and convey no intrinsic schedule difference.
-2. **Cross-Capture Identity Matching:** Identity across distinct capture runs or timetable versions cannot rely solely on raw suffix matching. Joins and path tracking utilize the **fingerprint**:
+2. **Cross-Capture Identity Matching:** Identity across distinct capture runs or timetable versions cannot rely solely on raw suffix matching. Joins, path tracking, and the **Semantic Diff Engine** utilize the **fingerprint**:
    $$\text{Fingerprint} = (\text{base\_train\_no}, \text{origin\_station}, \text{dest\_station}, \text{arrival\_time} \pm \text{tolerance})$$
+   Matching trips by fingerprint allows the diff engine to distinguish operational re-lettering (e.g., `5022D → 5022E`) from genuine service additions or withdrawals, eliminating false positive churn in diagnostic reports.
 3. **Identifier Grammar:** 100% of discovered IDs must conform to:
    $$\verb|^(\d+)([A-E])?(F)?$|$$
    Extracting `base_train_no`, `revision`, and optional `F` (fakultatif) flag. Any non-conforming identifier must be quarantined immediately.
@@ -453,9 +454,9 @@ data/raw/
           └── ...
 ```
 
-**`timetable_version` Assignment Rule:** During `capture`, the engine queries the station master for the active `region_scope` and inspects existing capture manifests under `data/raw/`. Version assignment follows a two-tier check:
-1. **Station Catalog Gate:** If `station_master_hash` differs from the active edition manifest, a physical network catalog mutation is detected, prompting to initialize `<timetable_version + 1>`.
-2. **Board Signature Drift Gate:** If `station_master_hash` matches, `capture` completes the station departure board fan-out in memory and computes `board_response_hash`. If an existing snapshot of the **same day type** exists in `<timetable_version>`, the hashes are compared. A mismatch indicates an unannounced mid-edition timetable revision, prompting the operator before writing or committing: *"Board signature diverges from active edition baseline for day type. Suspected new timetable edition. Increment version? [y/N]"*.
+**`timetable_version` Assignment Rule:** During `capture`, the engine queries the station master for the active `region_scope` and inspects existing capture manifests under `data/raw/`. Baseline comparisons in both gates strictly evaluate against historical snapshots with `status: "complete"`; degraded captures (which missed stations due to transient transport errors) are never used as comparison baselines. Version assignment follows a two-tier check:
+1. **Station Catalog Gate:** Evaluates `station_master_hash` against the latest complete snapshot in the active version. If divergent, the engine executes a semantic catalog diff reporting added, removed, renamed, or modified stations (e.g. *"Station catalog mutated: 1 renamed (GGL -> GRG), 0 added/removed"*) before prompting to initialize `<timetable_version + 1>`.
+2. **Board Signature Drift Gate:** If `station_master_hash` matches, `capture` completes the station departure board fan-out in memory and computes `board_response_hash`. If an existing **complete** snapshot of the **same day type** exists in `<timetable_version>`, hashes are compared. A mismatch indicates an unannounced mid-edition timetable revision. Before prompting the operator, the engine executes a semantic board diff using trip fingerprints to classify changes into re-lettered, retimed, added, or cancelled trips (e.g. *"Board divergence: 1 re-lettered trip (5022D -> 5022E), 2 retimed trips, 0 added, 0 cancelled"*), providing actionable context before prompting: *"Board signature diverges from active edition baseline for day type. Suspected new timetable edition. Increment version? [y/N]"*.
 3. **Explicit Override:** Operators can explicitly force a clean edition increment via `capture --new-version` (e.g. for announced GAPEKA timetable overhauls).
 
 ### 8.2 The Capture Manifest Contract (`manifest.json`)
@@ -522,6 +523,7 @@ Execution runs via a local TypeScript/Bun CLI toolchain requiring zero long-runn
        └───────────┘
 
   Out-of-DAG Operational Tools:
+  • diff:     Pure read-only semantic comparison across snapshots, versions, or itineraries.
   • calendar: Pure read-only set-difference inspection & empirical verification report.
   • detect:   Out-of-band operational probe run ad-hoc against live station boards for drift.
 ```
@@ -534,13 +536,14 @@ Execution runs via a local TypeScript/Bun CLI toolchain requiring zero long-runn
 | `census` | $\ge 1$ snapshot | Itinerary raw payloads (multi-observation envelope) | Any time; incremental, resumable | Side-effectful, cache-keyed |
 | `build` | Archive + config | SQLite DB (`trip_calendar`, `quarantined_trips`) | $\ge 1$ complete snapshot, same edition | **Pure fold, deterministic** |
 | `export` | DB + config | GTFS CSVs + validation report | Any build | Pure |
+| `diff` | $\ge 2$ snapshots / envelopes | Semantic diff report (stations, boards, itineraries) | Any $\ge 2$ raw snapshots or envelopes | Pure, read-only (out-of-DAG) |
 | `calendar` | DB / Archive | Set-difference report & diff table | $\ge 2$ same-edition day types | Pure, read-only (out-of-DAG) |
 | `detect` | 3 corridor hub boards | Drift report vs. active edition day type | Any time post-build | Side-effectful probe (out-of-DAG) |
 
 ### CLI Command Reference
-- **`capture`**: Evaluates the current date against `data/holidays.json`, displays the calculated `day_type`, prompts for user confirmation, queries the station master, and fans out across all station departure boards (~85 stations, concurrency 5, ~3 minutes total). Computes `station_master_hash` and `board_response_hash`, verifies against existing same-day-type manifests in the active version to detect schedule edition drift before disk write, emits `manifest.json`, and commits raw payloads to git. Supports `--new-version` to explicitly bootstrap a fresh timetable edition (e.g., for published GAPEKA revisions).
+- **`capture`**: Evaluates the current date against `data/holidays.json`, displays the calculated `day_type`, prompts for user confirmation, queries the station master, and fans out across all station departure boards (~85 stations, concurrency 5, ~3 minutes total). Computes `station_master_hash` and `board_response_hash`, verifies against existing same-day-type complete manifests in the active version to detect schedule edition drift before disk write, emits `manifest.json`, and commits raw payloads to git. On divergence, executes semantic catalog/board diffs to explain mutations in plain terms. Supports `--new-version` to explicitly bootstrap a fresh timetable edition (e.g., for published GAPEKA revisions).
 - **`census`**: Reads all discovered `train_id` values across existing snapshot captures, checks the local payload cache, and issues requests for missing itineraries (~1,000–1,500 calls, concurrency 4, ~35–40 minutes). Resumable and incremental; fetches only unprobed IDs.
-  - **Stratified Spot-Check:** When executing against an existing cache on a subsequent day type, `census` runs an automated stratified probe (~30–45 s) sampling 5 representative services: 1 Bogor trunk train, 1 Cikarang trunk train, 1 loop-line train (racket topology), 1 branch line train (Rangkasbitung or Merak), and 1 fakultatif (`F`-suffix) train. (For `F`-suffix trains on weekends, an upstream 404 or departure board absence represents expected operational suspension, not hash divergence). It compares canonical `payload_hash` values against cached weekday observations. If no divergence is detected in sampled strata, delta census proceeds for newly discovered `train_id`s. If divergence is detected, the runbook escalation path is engaged.
+  - **Stratified Spot-Check:** When executing against an existing cache on a subsequent day type, `census` runs an automated stratified probe (~30–45 s) sampling 5 representative services: 1 Bogor trunk train, 1 Cikarang trunk train, 1 loop-line train (racket topology), 1 branch line train (Rangkasbitung or Merak), and 1 fakultatif (`F`-suffix) train. (For `F`-suffix trains on weekends, an upstream 404 or departure board absence represents expected operational suspension, not hash divergence). It compares canonical `payload_hash` values against cached weekday observations. If divergence is detected, `census` invokes the stop-level itinerary diff engine to print an actionable explanation of exact stop sequence or timing changes ($\pm\Delta$ seconds) alongside the runbook escalation warning.
   - **CLI Flags:**
     - `--reprobe-all`: Force-queries all active trains under the queried day type, populating day-specific `observations[day_type]`.
     - `--day-type <type>`: Explicitly overrides or sets the target day-type context (`weekday`, `saturday`, `sunday`, `holiday`). When supplied, the engine validates that a completed capture manifest (`manifest.json` with `status: "complete"`) exists under `data/raw/<version>/captures/` for that `day_type` before issuing network itinerary probes, preventing orphaned day-type observations.
@@ -549,8 +552,14 @@ Execution runs via a local TypeScript/Bun CLI toolchain requiring zero long-runn
   - `--require-resolved-calendar`: Enforces that all 3 day types (weekday, Saturday, Sunday) have been folded into `trip_calendar` with `calendar_state = 'resolved'`.
   - `--require-census-complete`: Asserts that zero discovered trips remain with `itinerary_status = 'unprobed'`, preventing incomplete stop sequences from entering production feeds.
   - `--require-holiday-coverage`: Asserts that the export feed validity horizon does not extend past the latest statutory date defined in `data/holidays.json`. When omitted, emits a visible audit warning if feed dates exceed covered holiday decrees.
-- **`calendar`**: (Out-of-DAG read-only tool) Pretty-prints the three-way set-difference across day types for human review, outputting empirical schedule identity statistics (verifying static vs. date-aware behavior).
-- **`detect`**: (Out-of-DAG operational monitor) Probes a 3-station signature representing key corridor families—Manggarai (Central/Bogor), Bekasi (Cikarang), and Rangkasbitung (Western branch)—and compares the live departures against the active database edition filtered for **today's specific day type** (`trip_calendar[day_type] == 1`). Eliminates false positives from weekend calendar variance and avoids spatial blind spots on branch lines in ~15 seconds.
+- **`diff`**: (Out-of-DAG semantic diffing tool) Pure functional, ephemeral comparison of raw snapshot archives or itinerary envelopes. Supports pairwise snapshot diffing (`krl diff <snapA> <snapB>` or `krl diff --v1 <v1> --v2 <v2>`) and itinerary diffing (`krl diff --train <idA> <idB>`). Features:
+  - **Station Catalog Delta:** Added, removed, renamed, or modified stations.
+  - **Departure Board Delta:** Fingerprint-based trip matching ($\text{base\_train\_no}$, origin, dest, arrival $\pm$ tolerance) classifying trips as re-lettered (`5022D → 5022E`), retimed departures ($\pm\Delta$ minutes), or added/withdrawn services.
+  - **Itinerary Delta:** Stop sequence changes, added/removed stops, dwell & transit variations ($\pm\Delta$ seconds).
+  - **Day-Type Awareness:** Automatically annotates comparisons. Same-day comparisons are flagged as *potential edition drift*; cross-day comparisons are classified as *calendar variance*, suppressing false alarms.
+  - **Flags:** Default summary view and `--detail` (station-by-station and stop-by-stop drill-down).
+- **`calendar`**: (Out-of-DAG read-only tool) Pretty-prints the three-way set-difference across day types for human review, powered by the shared fingerprint trip-matching engine, outputting empirical schedule identity statistics (verifying static vs. date-aware behavior).
+- **`detect`**: (Out-of-DAG operational monitor) Probes a 3-station signature representing key corridor families—Manggarai (Central/Bogor), Bekasi (Cikarang), and Rangkasbitung (Western branch)—and compares the live departures against the active database edition filtered for **today's specific day type** (`trip_calendar[day_type] == 1`), reusing the core departure comparison logic. Eliminates false positives from weekend calendar variance and avoids spatial blind spots on branch lines in ~15 seconds.
 
 ### Auxiliary Tooling
 - **`scripts/fetch-station-coordinates.ts`**: Standalone extraction script executed via Bun. Queries the public Overpass API using strict spatial bounding and negative operator/mode filters, resolves OSM tagging inconsistencies, and generates the canonical `data/station_coordinates.csv` file for offline `build` and `export` runs.

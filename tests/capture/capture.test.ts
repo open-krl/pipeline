@@ -211,15 +211,21 @@ describe("src/capture/capture", () => {
 		};
 		const client2 = createMockClient({ stations: mutatedStations });
 
+		let gate1Prompt = "";
 		// Operator declines bump
 		await expect(
 			executeCapture({
 				client: client2,
 				dataDir: TEST_SCRATCH_DIR,
 				dayType: "weekday",
-				promptFn: async () => false,
+				promptFn: async (msg) => {
+					gate1Prompt = msg;
+					return false;
+				},
 			}),
 		).rejects.toThrow("Gate 1 Alert");
+		expect(gate1Prompt).toContain("[Gate 1 Alert]");
+		expect(gate1Prompt).toContain("1 added");
 	});
 
 	it("Gate 1 increments timetable version when operator confirms station catalog mutation", async () => {
@@ -281,15 +287,21 @@ describe("src/capture/capture", () => {
 		};
 		const client2 = createMockClient({ mriBoard: mutatedMriBoard });
 
+		let gate2Prompt = "";
 		// Operator declines bump
 		await expect(
 			executeCapture({
 				client: client2,
 				dataDir: TEST_SCRATCH_DIR,
 				dayType: "weekday",
-				promptFn: async () => false,
+				promptFn: async (msg) => {
+					gate2Prompt = msg;
+					return false;
+				},
 			}),
 		).rejects.toThrow("Gate 2 Alert");
+		expect(gate2Prompt).toContain("[Gate 2 Alert]");
+		expect(gate2Prompt).toContain("[Edition Drift] 1 retimed");
 	});
 
 	it("Gate 2 increments version when operator confirms timetable edition revision", async () => {

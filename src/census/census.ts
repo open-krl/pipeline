@@ -179,10 +179,10 @@ export async function executeCensus(
 
 		if (!stratifiedCheck.passed) {
 			const divDetails = stratifiedCheck.divergences
-				.map(
-					(d) =>
-						`  - [${d.stratum}] ${d.trainId}: ${d.baselineHash.slice(0, 10)}... vs ${d.liveHash.slice(0, 10)}...`,
-				)
+				.map((d) => {
+					const explanation = d.diffSummary ? `\n      ${d.diffSummary}` : "";
+					return `  - [${d.stratum}] ${d.trainId}: ${d.baselineHash.slice(0, 10)}... vs ${d.liveHash.slice(0, 10)}...${explanation}`;
+				})
 				.join("\n");
 			console.warn(
 				`\n⚠️  [STRATIFIED SPOT-CHECK WARNING] Schedule divergence detected in representative services between weekday and ${targetDayType}:\n${divDetails}\nRunbook escalation: Consider running 'census --reprobe-all --day-type ${targetDayType}'.\n`,

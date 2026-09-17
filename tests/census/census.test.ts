@@ -321,6 +321,8 @@ describe("src/census/census", () => {
 		expect(check.passed).toBe(false);
 		expect(check.divergences.length).toBe(1);
 		expect(check.divergences[0].trainId).toBe("2200");
+		expect(check.divergences[0].diffSummary).toBeDefined();
+		expect(check.divergences[0].diffSummary).toContain("retimed");
 		// 9002F (fakultatif) 404 did not count as divergence
 	});
 

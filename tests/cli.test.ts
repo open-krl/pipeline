@@ -179,22 +179,75 @@ describe("src/cli — CAC architecture", () => {
 		expect(parsed.options.dumpCsv).toBe("data/custom-csv");
 	});
 
-	it("executes remaining milestone stub commands cleanly", async () => {
-		const logs: string[] = [];
-		const origLog = console.log;
-		console.log = (msg: string) => logs.push(msg);
+	it("parses calendar positional arguments and options", () => {
+		const cli = createCli();
+		const parsed = cli.parse(
+			[
+				"bun",
+				"src/cli.ts",
+				"calendar",
+				"2",
+				"--data-dir",
+				"data/custom-raw",
+				"--db-path",
+				"data/build/krl_v2.db",
+				"--tolerance",
+				"600",
+				"--detail",
+				"--json",
+			],
+			{ run: false },
+		);
 
-		try {
-			for (const cmd of ["calendar", "detect"]) {
-				const cli = createCli();
-				cli.parse(["bun", "src/cli.ts", cmd], { run: false });
-				await cli.runMatchedCommand();
-			}
-			expect(logs.length).toBe(2);
-			expect(logs[0]).toContain("calendar");
-			expect(logs[1]).toContain("detect");
-		} finally {
-			console.log = origLog;
-		}
+		expect(cli.matchedCommand?.name).toBe("calendar");
+		expect(parsed.args[0]).toBe("2");
+		expect(parsed.options.dataDir).toBe("data/custom-raw");
+		expect(parsed.options.dbPath).toBe("data/build/krl_v2.db");
+		expect(parsed.options.tolerance).toBe(600);
+		expect(parsed.options.detail).toBe(true);
+		expect(parsed.options.json).toBe(true);
+	});
+
+	it("parses detect positional arguments and options", () => {
+		const cli = createCli();
+		const parsed = cli.parse(
+			[
+				"bun",
+				"src/cli.ts",
+				"detect",
+				"1",
+				"--date",
+				"2026-09-17",
+				"--day-type",
+				"weekday",
+				"--db-path",
+				"data/build/krl_v1.db",
+				"--data-dir",
+				"data/raw",
+				"--raw",
+				"--stations",
+				"MRI,BKS",
+				"--holidays-path",
+				"data/holidays.json",
+				"--tolerance",
+				"900",
+				"--fail-on-drift",
+				"--json",
+			],
+			{ run: false },
+		);
+
+		expect(cli.matchedCommand?.name).toBe("detect");
+		expect(parsed.args[0]).toBe("1");
+		expect(parsed.options.date).toBe("2026-09-17");
+		expect(parsed.options.dayType).toBe("weekday");
+		expect(parsed.options.dbPath).toBe("data/build/krl_v1.db");
+		expect(parsed.options.dataDir).toBe("data/raw");
+		expect(parsed.options.raw).toBe(true);
+		expect(parsed.options.stations).toBe("MRI,BKS");
+		expect(parsed.options.holidaysPath).toBe("data/holidays.json");
+		expect(parsed.options.tolerance).toBe(900);
+		expect(parsed.options.failOnDrift).toBe(true);
+		expect(parsed.options.json).toBe(true);
 	});
 });

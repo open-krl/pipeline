@@ -23,7 +23,12 @@ import {
 	CaptureManifestSchema,
 	type DayType,
 } from "../archive/schemas";
-import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
+import {
+	readSnapshotBoards,
+	readSnapshotStations,
+	scanSnapshots,
+	scanTimetableVersions,
+} from "../archive/snapshots";
 import {
 	DEFAULT_REGION_SCOPE,
 	REGION_GROUPS,
@@ -39,6 +44,8 @@ import {
 } from "../core/logger";
 import { resolveSafePath } from "../core/path";
 import { loadHolidays } from "../db/holidays";
+import { diffDepartureBoards } from "../diagnostic/board";
+import { diffStationCatalogs } from "../diagnostic/catalog";
 
 export interface CaptureOptions {
 	client?: KciClient;
@@ -178,6 +185,7 @@ export function resolveCaptureContext(options: CaptureOptions) {
 export interface Gate1Params {
 	dataDir: string;
 	currentStationMasterHash: string;
+	currentStations?: readonly StationItem[];
 	newVersion: boolean;
 	yes: boolean;
 	prompt: (question: string, defaultYes?: boolean) => Promise<boolean>;
@@ -191,6 +199,7 @@ export interface Gate1Result {
 
 /**
  * Gate 1: Compares active station catalog hash against existing versions (§8.1).
+ * Strictly evaluates against snapshots with status: "complete".
  */
 export async function evaluateGate1(params: Gate1Params): Promise<Gate1Result> {
 	const existingVersions = await scanTimetableVersions(params.dataDir);
@@ -216,7 +225,10 @@ export async function evaluateGate1(params: Gate1Params): Promise<Gate1Result> {
 	}
 
 	const existingSnapshots = await scanSnapshots(params.dataDir, activeVersion);
-	if (existingSnapshots.length === 0) {
+	const completeSnapshots = existingSnapshots.filter(
+		(s) => s.manifest.status === "complete",
+	);
+	if (completeSnapshots.length === 0) {
 		return {
 			activeVersion,
 			versionToUse: activeVersion,
@@ -224,10 +236,31 @@ export async function evaluateGate1(params: Gate1Params): Promise<Gate1Result> {
 		};
 	}
 
-	const latestManifest =
-		existingSnapshots[existingSnapshots.length - 1].manifest;
+	const latestCompleteSnapshot =
+		completeSnapshots[completeSnapshots.length - 1];
+	const latestManifest = latestCompleteSnapshot.manifest;
 	if (latestManifest.station_master_hash !== params.currentStationMasterHash) {
-		const promptMsg = `[Gate 1 Alert] Station master hash differs from active version ${activeVersion} (${latestManifest.station_master_hash.slice(0, 8)} -> ${params.currentStationMasterHash.slice(0, 8)}). Network catalog mutated. Increment timetable version to ${activeVersion + 1}?`;
+		let diffSummary = "";
+		if (params.currentStations) {
+			try {
+				const baselineStations = await readSnapshotStations(
+					params.dataDir,
+					activeVersion,
+					latestCompleteSnapshot.id,
+				);
+				if (baselineStations) {
+					const diff = diffStationCatalogs(
+						baselineStations.data,
+						params.currentStations,
+					);
+					diffSummary = `\n  ${diff.summary}`;
+				}
+			} catch {
+				// Ignore loading error, fallback to hash display
+			}
+		}
+
+		const promptMsg = `[Gate 1 Alert] Station master hash differs from active version ${activeVersion} (${latestManifest.station_master_hash.slice(0, 8)} -> ${params.currentStationMasterHash.slice(0, 8)}).${diffSummary}\nNetwork catalog mutated. Increment timetable version to ${activeVersion + 1}?`;
 
 		if (params.yes) {
 			throw new Error(
@@ -346,6 +379,9 @@ export interface Gate2Params {
 	shouldBumpVersion: boolean;
 	resolvedDayType: DayType;
 	currentBoardResponseHash: string;
+	currentBoards?:
+		| Record<string, readonly DepartureBoardItem[]>
+		| Map<string, readonly DepartureBoardItem[]>;
 	yes: boolean;
 	prompt: (question: string, defaultYes?: boolean) => Promise<boolean>;
 }
@@ -379,7 +415,31 @@ export async function evaluateGate2(params: Gate2Params): Promise<Gate2Result> {
 	if (sameDayTypeSnapshot) {
 		const existingHash = sameDayTypeSnapshot.manifest.board_response_hash;
 		if (existingHash !== params.currentBoardResponseHash) {
-			const promptMsg = `[Gate 2 Alert] Board signature differs for day type '${params.resolvedDayType}' compared to snapshot ${sameDayTypeSnapshot.id} (${existingHash.slice(0, 8)} -> ${params.currentBoardResponseHash.slice(0, 8)}). Potential timetable edition revision. Increment timetable version to ${params.versionToUse + 1}?`;
+			let diffSummary = "";
+			if (params.currentBoards) {
+				try {
+					const baselineBoardsMap = await readSnapshotBoards(
+						params.dataDir,
+						params.versionToUse,
+						sameDayTypeSnapshot.id,
+					);
+					const baselineBoardsFlat = new Map<string, DepartureBoardItem[]>();
+					for (const [staId, res] of baselineBoardsMap.entries()) {
+						baselineBoardsFlat.set(staId, res.data);
+					}
+					const diff = diffDepartureBoards({
+						boardsBefore: baselineBoardsFlat,
+						boardsAfter: params.currentBoards,
+						manifestBefore: sameDayTypeSnapshot.manifest,
+						manifestAfter: { day_type: params.resolvedDayType },
+					});
+					diffSummary = `\n  ${diff.summary}`;
+				} catch {
+					// Ignore diff failure, fallback to hash display
+				}
+			}
+
+			const promptMsg = `[Gate 2 Alert] Board signature differs for day type '${params.resolvedDayType}' compared to snapshot ${sameDayTypeSnapshot.id} (${existingHash.slice(0, 8)} -> ${params.currentBoardResponseHash.slice(0, 8)}).${diffSummary}\nPotential timetable edition revision. Increment timetable version to ${params.versionToUse + 1}?`;
 
 			if (params.yes) {
 				throw new Error(
@@ -581,6 +641,7 @@ export async function executeCapture(
 	const gate1 = await evaluateGate1({
 		dataDir: ctx.dataDir,
 		currentStationMasterHash,
+		currentStations: stationsResponse.data,
 		newVersion: ctx.newVersion,
 		yes: ctx.yes,
 		prompt: ctx.prompt,
@@ -615,6 +676,7 @@ export async function executeCapture(
 		shouldBumpVersion: gate1.shouldBumpVersion,
 		resolvedDayType: ctx.resolvedDayType,
 		currentBoardResponseHash,
+		currentBoards: boardsResult.boardsMap,
 		yes: ctx.yes,
 		prompt: ctx.prompt,
 	});
