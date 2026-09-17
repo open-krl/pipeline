@@ -1,14 +1,9 @@
 // src/diagnostic/detect.ts
 import { Database } from "bun:sqlite";
 import { promises as fs } from "node:fs";
-import path from "node:path";
 import { KciClient } from "../api/client";
 import type { DepartureBoardItem } from "../api/schemas";
-import {
-	readSnapshotBoards,
-	scanSnapshots,
-	scanTimetableVersions,
-} from "../archive/snapshots";
+import { readSnapshotBoards, scanSnapshots } from "../archive/snapshots";
 import { CORRIDOR_REFERENCE_STATIONS, TIMEZONE } from "../config";
 import {
 	type DayType,
@@ -19,6 +14,7 @@ import {
 	resolveDayType,
 } from "../core/calendar";
 import { resolveSafePath } from "../core/path";
+import { resolveDiagnosticBaseline } from "./baseline";
 import { diffDepartureBoards } from "./board";
 import type {
 	CorridorDriftStatus,
@@ -126,44 +122,21 @@ export async function executeDetect(
 	];
 
 	// 3. Resolve Baseline Source & Departures
-	let timetableVersion = options.version;
-	let baselineSource: "database" | "snapshots" = "database";
+	const baseline = await resolveDiagnosticBaseline({
+		version: options.version,
+		dataDir: options.dataDir,
+		dbPath: options.dbPath,
+		cwd,
+		preferSource: "database",
+	});
+
+	const timetableVersion = baseline.version;
+	const baselineSource = baseline.source;
 	const expectedBoards = new Map<string, DepartureBoardItem[]>();
 
-	// Try DB if explicitly provided, or if neither dbPath nor dataDir is specified
-	let dbPath: string | null = null;
-	if (options.dbPath) {
-		dbPath = resolveSafePath(options.dbPath, cwd);
-	} else if (!options.dataDir) {
-		const v = timetableVersion ?? 1;
-		const candidateDb = path.join(cwd, "data/build", `krl_v${v}.db`);
-		if (
-			await fs
-				.stat(candidateDb)
-				.then(() => true)
-				.catch(() => false)
-		) {
-			dbPath = candidateDb;
-		}
-	}
-
-	if (
-		dbPath &&
-		(await fs
-			.stat(dbPath)
-			.then(() => true)
-			.catch(() => false))
-	) {
-		const db = new Database(dbPath, { readonly: true });
+	if (baseline.source === "database") {
+		const db = new Database(baseline.dbPath, { readonly: true });
 		try {
-			if (timetableVersion === undefined) {
-				const vRow = db
-					.query<{ timetable_version: number }, []>(
-						"SELECT DISTINCT timetable_version FROM trips LIMIT 1",
-					)
-					.get();
-				timetableVersion = vRow?.timetable_version ?? 1;
-			}
 			for (const staId of targetStations) {
 				const deps = loadStationDeparturesFromDb(
 					db,
@@ -173,23 +146,11 @@ export async function executeDetect(
 				);
 				expectedBoards.set(staId, deps);
 			}
-			baselineSource = "database";
 		} finally {
 			db.close();
 		}
 	} else {
-		// Fallback to raw snapshot boards
-		baselineSource = "snapshots";
-		const rawDir = resolveSafePath(options.dataDir ?? "data/raw", cwd);
-		if (timetableVersion === undefined) {
-			const versions = await scanTimetableVersions(rawDir);
-			if (versions.length === 0) {
-				throw new Error("No timetable versions found in raw data directory.");
-			}
-			timetableVersion = versions[versions.length - 1];
-		}
-
-		const allSnaps = await scanSnapshots(rawDir, timetableVersion);
+		const allSnaps = await scanSnapshots(baseline.dataDir, timetableVersion);
 		const completeSnaps = allSnaps.filter(
 			(s) =>
 				s.manifest.status === "complete" && s.manifest.day_type === dayType,
@@ -202,7 +163,7 @@ export async function executeDetect(
 		}
 
 		const snapshotBoards = await readSnapshotBoards(
-			rawDir,
+			baseline.dataDir,
 			timetableVersion,
 			latestSnap.id,
 		);

@@ -1,8 +1,6 @@
 // src/diagnostic/calendar.ts
 
 import { Database } from "bun:sqlite";
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import type {
 	DepartureBoardItem,
 	DepartureBoardResponse,
@@ -12,7 +10,7 @@ import {
 	scanSnapshots,
 	scanTimetableVersions,
 } from "../archive/snapshots";
-import { resolveSafePath } from "../core/path";
+import { resolveDiagnosticBaseline } from "./baseline";
 import {
 	extractTripSummaries,
 	findBestFingerprintCandidate,
@@ -448,12 +446,19 @@ export async function loadCalendarData(params: {
 	saturdayTrips: Map<string, TripSummary> | null;
 	sundayTrips: Map<string, TripSummary> | null;
 }> {
-	const cwd = params.cwd ?? process.cwd();
+	const baseline = await resolveDiagnosticBaseline({
+		version: params.version,
+		dataDir: params.dataDir,
+		dbPath: params.dbPath,
+		cwd: params.cwd,
+		preferSource: "snapshots",
+	});
 
-	// 1. Explicit DB path provided
-	if (params.dbPath) {
-		const resolvedDb = resolveSafePath(params.dbPath, cwd);
-		const dbData = await loadCalendarFromDatabase(resolvedDb, params.version);
+	if (baseline.source === "database") {
+		const dbData = await loadCalendarFromDatabase(
+			baseline.dbPath,
+			baseline.version,
+		);
 		return {
 			version: dbData.version,
 			source: "database",
@@ -463,48 +468,17 @@ export async function loadCalendarData(params: {
 		};
 	}
 
-	// 2. Try raw snapshot archive
-	const rawDir = resolveSafePath(params.dataDir ?? "data/raw", cwd);
-	try {
-		const snapData = await loadCalendarFromSnapshots(rawDir, params.version);
-		if (
-			snapData.weekdayTrips ||
-			snapData.saturdayTrips ||
-			snapData.sundayTrips
-		) {
-			return {
-				version: snapData.version,
-				source: "snapshots",
-				weekdayTrips: snapData.weekdayTrips,
-				saturdayTrips: snapData.saturdayTrips,
-				sundayTrips: snapData.sundayTrips,
-			};
-		}
-	} catch {
-		// Fallback to SQLite if raw directory unavailable
-	}
-
-	// 3. Fallback to default build database
-	const v = params.version ?? 1;
-	const defaultDb = path.join(cwd, "data/build", `krl_v${v}.db`);
-	const dbExists = await fs
-		.stat(defaultDb)
-		.then(() => true)
-		.catch(() => false);
-	if (dbExists) {
-		const dbData = await loadCalendarFromDatabase(defaultDb, v);
-		return {
-			version: dbData.version,
-			source: "database",
-			weekdayTrips: dbData.weekdayTrips,
-			saturdayTrips: dbData.saturdayTrips,
-			sundayTrips: dbData.sundayTrips,
-		};
-	}
-
-	throw new Error(
-		`No timetable data found for version ${params.version ?? "latest"} in raw snapshots (${rawDir}) or database (${defaultDb}).`,
+	const snapData = await loadCalendarFromSnapshots(
+		baseline.dataDir,
+		baseline.version,
 	);
+	return {
+		version: snapData.version,
+		source: "snapshots",
+		weekdayTrips: snapData.weekdayTrips,
+		saturdayTrips: snapData.saturdayTrips,
+		sundayTrips: snapData.sundayTrips,
+	};
 }
 
 /**
