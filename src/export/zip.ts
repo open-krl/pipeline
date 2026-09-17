@@ -19,7 +19,11 @@ export function createGtfsZip(files: Record<string, string>): PackageZipResult {
 		zipInput[filename] = strToU8(content);
 	}
 
-	const zipBuffer = zipSync(zipInput, { level: 9 });
+	// Use fixed DOS epoch mtime (1980-01-01) for deterministic ZIP bytes and SHA-256 digests
+	const zipBuffer = zipSync(zipInput, {
+		level: 9,
+		mtime: new Date(1980, 0, 1),
+	});
 	const sha256 = crypto.createHash("sha256").update(zipBuffer).digest("hex");
 
 	return {
