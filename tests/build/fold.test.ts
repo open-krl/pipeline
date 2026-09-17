@@ -135,6 +135,8 @@ describe("Pure Functional Fold Suite", () => {
 		expect(stops5552A[0].stop_sequence).toBe(1);
 		expect(stops5552A[0].arrival_secs).toBeNull();
 		expect(stops5552A[17].departure_secs).toBeNull();
+		expect(trip5552A?.origin_secs).toBe(stops5552A[0].departure_secs!);
+		expect(trip5552A?.dest_secs).toBe(stops5552A[17].arrival_secs!);
 
 		// Verify Holidays
 		expect(result.holidays.length).toBe(1);

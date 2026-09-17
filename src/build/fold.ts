@@ -3,7 +3,7 @@ import type { ItineraryStop } from "../api/schemas";
 import type { DayType } from "../archive/schemas";
 import { resolveStationCode } from "../config";
 import { resolveStationId } from "../core/route";
-import { parseHMS, resolveItinerarySecs, toServiceDaySecs } from "../core/time";
+import { resolveItinerarySecs, toServiceDaySecs } from "../core/time";
 import { parseTrainId } from "../core/trainid";
 import type * as schema from "../db/tables";
 import {
@@ -370,7 +370,8 @@ export function foldArchive(archive: RawArchive): FoldResult {
 				originStationId = resolveStationCode(stops[0].station_id);
 				originTime = stops[0].time_est;
 				destTime = lastStop.time_est;
-				originSecs = parseHMS(originTime);
+				originSecs =
+					resolvedSecs[0].departure_secs ?? toServiceDaySecs(originTime);
 				destSecs =
 					resolvedSecs[resolvedSecs.length - 1].arrival_secs ??
 					toServiceDaySecs(destTime);
