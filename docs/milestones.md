@@ -23,7 +23,7 @@ flowchart LR
 | **Milestone 3** | Stage 2 Census (`krl census`) | Stratified spot-checks, resumable crawler, multi-observation envelopes | ✅ **Completed** |
 | **Milestone 4** | Stage 3 Build (`krl build`) | Pure functional fold, 13 invariants, topological fallback, SQLite WAL DB | ✅ **Completed** |
 | **Milestone 5** | Stage 4 Export (`krl export`) | GTFS spec CSVs, release gates, validation report, zip packaging | ✅ **Completed** |
-| **Milestone 6** | Diagnostic Tooling | Out-of-DAG tools: `krl calendar` (diff report) and `krl detect` (live probe) | 🟡 **Next Up** |
+| **Milestone 6** | Semantic Diffing & Diagnostics | Out-of-DAG tools: Core diff engine, `krl diff`, Gate 1/2 & census explanations, `krl calendar`, `krl detect` | 🟡 **Next Up** |
 | **Milestone 7** | Automation & Hardening | CI/CD test automation, scheduled cron captures, release distribution | ⚪ Planned |
 
 ---
@@ -118,11 +118,23 @@ flowchart LR
 
 ---
 
-### Milestone 6: Operational & Diagnostic Tooling 🟡 (Next Up)
-- [ ] **Task 6.1: `krl calendar` (Out-of-DAG Empirical Inspection Tool)**
-  - Three-way set-difference report across `weekday`, `saturday`, and `sunday`.
+### Milestone 6: Semantic Diffing & Operational Diagnostics 🟡 (Next Up)
+- [ ] **Task 6.1: Core Semantic Diff Engine (`src/diagnostic/diff.ts`)**
+  - Pure functional diffing across 3 raw artifacts: station catalog (`stations.json`), departure boards (`boards/*.json`), and itinerary envelopes (`itineraries/*.json`).
+  - Fingerprint-based trip matching ($\text{base\_train\_no}$, origin, dest, arrival $\pm$ tolerance) distinguishing re-lettering (`5022D → 5022E`), retimed departures ($\pm\Delta$ mins), and added/withdrawn trips.
+  - Stop-level itinerary diffing (sequence changes, added/removed stops, dwell & transit $\pm\Delta$ seconds).
+  - Day-type awareness classifying cross-day comparisons as expected calendar variance vs same-day comparisons as edition drift.
+- [ ] **Task 6.2: `krl diff` CLI Tool (`src/diagnostic/cli-diff.ts`)**
+  - Standalone command to diff two snapshots (`krl diff 1:1 1:3` or `krl diff --v1 1 --v2 2`) or two itinerary envelopes (`krl diff --train 5022D 5022E`).
+  - Ephemeral terminal rendering with summary metrics and station/trip drill-down flags (`--summary`, `--detail`).
+- [ ] **Task 6.3: Capture Gate & Census Spot-Check Semantic Integration**
+  - Wire semantic diff summaries into Gate 1 (catalog) and Gate 2 (boards) in `krl capture` before the version-bump prompt.
+  - Enforce degraded-baseline exclusion in Gate 1 & Gate 2 (compare only against `status: "complete"`).
+  - Wire stop-level itinerary diff into `runStratifiedSpotCheck` in `src/census/sample.ts` to explain representative service divergence.
+- [ ] **Task 6.4: `krl calendar` (Out-of-DAG Empirical Inspection Tool)**
+  - Three-way set-difference report across `weekday`, `saturday`, and `sunday` powered by the shared trip-matching engine.
   - Identity breakdown identifying shared base schedules vs. weekend/fakultatif augmentations.
-- [ ] **Task 6.2: `krl detect` (Out-of-DAG Operational Drift Probe)**
+- [ ] **Task 6.5: `krl detect` (Out-of-DAG Operational Drift Probe)**
   - 3-station live departure probe (Manggarai, Bekasi, Rangkasbitung) covering central trunk, eastern trunk, and western branch lines.
   - Automated comparison against active SQLite database filtered for today's active day type (`trip_calendar[day_type] == 1`).
   - Rapid (<15s) execution for automated cron or ad-hoc operator verification.
