@@ -7,7 +7,7 @@ import type {
 	DepartureBoardResponse,
 	StationMasterResponse,
 } from "../../src/api/schemas";
-import { executeCapture } from "../../src/capture/capture";
+import { executeCapture } from "../../src/capture/pipeline";
 
 const TEST_SCRATCH_DIR = path.resolve(
 	process.cwd(),

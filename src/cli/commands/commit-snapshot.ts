@@ -1,7 +1,7 @@
 import * as path from "node:path";
 import type { CAC } from "cac";
 import { scanSnapshots, scanTimetableVersions } from "../../archive/snapshots";
-import { commitCaptureSnapshot } from "../../capture/capture";
+import { commitCaptureSnapshot } from "../../capture/commit";
 import { resolveSafePath } from "../../core/path";
 import { errorMessage, exitError } from "../shared/parse";
 

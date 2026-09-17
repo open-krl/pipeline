@@ -10,7 +10,7 @@ import type { CaptureManifest } from "../../src/archive/schemas";
 import {
 	commitCaptureSnapshot,
 	formatSnapshotCommitMessage,
-} from "../../src/capture/capture";
+} from "../../src/capture/commit";
 import { formatCensusCommitMessage } from "../../src/census/census";
 import {
 	commitPath,
