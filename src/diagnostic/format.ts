@@ -131,6 +131,40 @@ export function formatBoardDiff(
 		}
 	}
 
+	if (
+		diff.unparsedTrips &&
+		(diff.unparsedTrips.before.length > 0 ||
+			diff.unparsedTrips.after.length > 0)
+	) {
+		const beforeSet = new Set(diff.unparsedTrips.before);
+		const afterSet = new Set(diff.unparsedTrips.after);
+		const added = diff.unparsedTrips.after.filter((id) => !beforeSet.has(id));
+		const removed = diff.unparsedTrips.before.filter((id) => !afterSet.has(id));
+		if (added.length > 0 || removed.length > 0) {
+			lines.push(
+				`  Unparsed / Non-standard Identifiers (+${added.length}/-${removed.length}):`,
+			);
+			const limit = options.detail ? added.length : 10;
+			for (let i = 0; i < limit && i < added.length; i++) {
+				lines.push(`    + [Unparsed ID] ${added[i]}`);
+			}
+			if (!options.detail && added.length > limit) {
+				lines.push(
+					`    ... and ${added.length - limit} more (use --detail to view all)`,
+				);
+			}
+			const removedLimit = options.detail ? removed.length : 10;
+			for (let i = 0; i < removedLimit && i < removed.length; i++) {
+				lines.push(`    - [Unparsed ID] ${removed[i]}`);
+			}
+			if (!options.detail && removed.length > removedLimit) {
+				lines.push(
+					`    ... and ${removed.length - removedLimit} more (use --detail to view all)`,
+				);
+			}
+		}
+	}
+
 	return lines.join("\n");
 }
 

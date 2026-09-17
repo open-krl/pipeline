@@ -285,11 +285,22 @@ export async function executeDiff(
 	console.log(
 		`KRL Snapshot Diff: v${result.snapshotBefore.version}:${result.snapshotBefore.snapshotId} (${result.manifestBefore.day_type}) -> v${result.snapshotAfter.version}:${result.snapshotAfter.snapshotId} (${result.manifestAfter.day_type})`,
 	);
+	const unparsedBeforeSet = new Set(result.boardDiff.unparsedTrips.before);
+	const unparsedAfterSet = new Set(result.boardDiff.unparsedTrips.after);
+	const hasUnparsedChanges =
+		result.boardDiff.unparsedTrips.before.some(
+			(id) => !unparsedAfterSet.has(id),
+		) ||
+		result.boardDiff.unparsedTrips.after.some(
+			(id) => !unparsedBeforeSet.has(id),
+		);
+
 	const hasBoardChanges =
 		result.boardDiff.relettered.length > 0 ||
 		result.boardDiff.retimed.length > 0 ||
 		result.boardDiff.added.length > 0 ||
-		result.boardDiff.withdrawn.length > 0;
+		result.boardDiff.withdrawn.length > 0 ||
+		hasUnparsedChanges;
 	const hasCatalogChanges =
 		result.catalogDiff != null &&
 		(result.catalogDiff.added.length > 0 ||

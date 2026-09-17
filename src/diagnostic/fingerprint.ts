@@ -37,6 +37,7 @@ export function extractTripSummaries(
 	boardsByStationId:
 		| Record<string, readonly DepartureBoardItem[]>
 		| Map<string, readonly DepartureBoardItem[]>,
+	unparsedTrainIds?: Set<string>,
 ): Map<string, TripSummary> {
 	const entries =
 		boardsByStationId instanceof Map
@@ -62,7 +63,12 @@ export function extractTripSummaries(
 	for (const [stationId, departures] of entries) {
 		for (const dep of departures) {
 			const parsedId = parseTrainId(dep.train_id);
-			if (!parsedId) continue;
+			if (!parsedId) {
+				if (unparsedTrainIds && dep.train_id) {
+					unparsedTrainIds.add(dep.train_id);
+				}
+				continue;
+			}
 
 			const depSecs = toServiceDaySecs(dep.time_est);
 			const destSecs = toServiceDaySecs(dep.dest_time);

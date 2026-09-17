@@ -57,8 +57,16 @@ export function diffDepartureBoards(
 	).length;
 
 	// Extract and match trips
-	const tripsBefore = extractTripSummaries(params.boardsBefore);
-	const tripsAfter = extractTripSummaries(params.boardsAfter);
+	const unparsedBefore = new Set<string>();
+	const unparsedAfter = new Set<string>();
+	const tripsBefore = extractTripSummaries(params.boardsBefore, unparsedBefore);
+	const tripsAfter = extractTripSummaries(params.boardsAfter, unparsedAfter);
+
+	const unparsedBeforeList = Array.from(unparsedBefore).sort();
+	const unparsedAfterList = Array.from(unparsedAfter).sort();
+	const unparsedDiffCount =
+		unparsedBeforeList.filter((id) => !unparsedAfter.has(id)).length +
+		unparsedAfterList.filter((id) => !unparsedBefore.has(id)).length;
 
 	const matchResult = matchTripsByFingerprint(
 		tripsBefore,
@@ -110,11 +118,38 @@ export function diffDepartureBoards(
 		coverageNotice = ` [Coverage: +${stationsOnlyInAfter.length} station${stationsOnlyInAfter.length > 1 ? "s" : ""} (${list}${suffix})]`;
 	}
 
+	let unparsedNotice = "";
+	if (unparsedBeforeList.length > 0 || unparsedAfterList.length > 0) {
+		const addedUnparsed = unparsedAfterList.filter(
+			(id) => !unparsedBefore.has(id),
+		);
+		const removedUnparsed = unparsedBeforeList.filter(
+			(id) => !unparsedAfter.has(id),
+		);
+		if (addedUnparsed.length > 0 || removedUnparsed.length > 0) {
+			const details: string[] = [];
+			if (addedUnparsed.length > 0) {
+				details.push(
+					`+${addedUnparsed.length} unparsed (e.g. ${addedUnparsed.slice(0, 2).join(", ")})`,
+				);
+			}
+			if (removedUnparsed.length > 0) {
+				details.push(
+					`-${removedUnparsed.length} unparsed (e.g. ${removedUnparsed.slice(0, 2).join(", ")})`,
+				);
+			}
+			unparsedNotice = ` [Unparsed: ${details.join(", ")}]`;
+		} else {
+			unparsedNotice = ` [${unparsedAfterList.length} unparsed trips present in both]`;
+		}
+	}
+
 	const hasChanges =
 		matchResult.relettered.length > 0 ||
 		matchResult.retimed.length > 0 ||
 		matchResult.added.length > 0 ||
-		matchResult.withdrawn.length > 0;
+		matchResult.withdrawn.length > 0 ||
+		unparsedDiffCount > 0;
 
 	const contextLabel = isCrossDayType
 		? `[Calendar Variance: ${dtBefore} -> ${dtAfter}]`
@@ -123,12 +158,12 @@ export function diffDepartureBoards(
 			: `[Identical]`;
 
 	let summary: string;
-	if (parts.length === 0 && !coverageNotice) {
+	if (parts.length === 0 && !coverageNotice && !unparsedNotice) {
 		summary = `${contextLabel} Boards identical (${matchResult.identical.length} trips, ${stationsInBoth} stations)`;
 	} else if (parts.length === 0) {
-		summary = `${contextLabel}${coverageNotice} All trips identical (${matchResult.identical.length} trips)`;
+		summary = `${contextLabel}${coverageNotice}${unparsedNotice} All parsed trips identical (${matchResult.identical.length} trips)`;
 	} else {
-		summary = `${contextLabel}${coverageNotice} ${parts.join(", ")} (${matchResult.identical.length} identical trips)`;
+		summary = `${contextLabel}${coverageNotice}${unparsedNotice} ${parts.join(", ")} (${matchResult.identical.length} identical trips)`;
 	}
 
 	return {
@@ -147,6 +182,10 @@ export function diffDepartureBoards(
 		retimed: matchResult.retimed,
 		added: matchResult.added,
 		withdrawn: matchResult.withdrawn,
+		unparsedTrips: {
+			before: unparsedBeforeList,
+			after: unparsedAfterList,
+		},
 		summary,
 	};
 }

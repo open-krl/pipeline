@@ -62,6 +62,10 @@ export interface BoardDiff {
 	retimed: BoardDiffTripItem[];
 	added: BoardDiffTripItem[];
 	withdrawn: BoardDiffTripItem[];
+	unparsedTrips: {
+		before: string[];
+		after: string[];
+	};
 	summary: string;
 }
 
