@@ -1,4 +1,4 @@
-# Open-KRL-Pipeline
+# Open-KRL Pipeline
 
 A deterministic ingestion, archival, and build pipeline that converts the Kereta Commuter Indonesia (KCI) station REST API into a normalized SQLite database and standard GTFS transit feeds.
 
