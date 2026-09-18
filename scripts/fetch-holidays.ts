@@ -61,7 +61,7 @@ async function main() {
 
 	const response = await fetch(endpoint, {
 		headers: {
-			"User-Agent": `${projectName}/1.5 (github.com/invictus-navarchus)`,
+			"User-Agent": `${projectName}/1.5`,
 			Accept: "application/json",
 		},
 	});

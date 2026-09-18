@@ -42,7 +42,7 @@ async function main() {
 	const response = await fetch(OVERPASS_ENDPOINT, {
 		method: "POST",
 		headers: {
-			"User-Agent": "KRL-Schedule-DB/1.2 (github.com/your-repo)",
+			"User-Agent": "KRL-Schedule-DB/1.2",
 			"Content-Type": "application/x-www-form-urlencoded",
 		},
 		body: `data=${encodeURIComponent(OVERPASS_QUERY)}`,
