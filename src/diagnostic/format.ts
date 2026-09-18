@@ -66,6 +66,7 @@ export function formatBoardDiff(
 	const lines: string[] = [
 		`Departure Boards: ${diff.summary}`,
 		`  Trips: ${diff.totalTripsBefore} before -> ${diff.totalTripsAfter} after (${diff.identicalCount} identical)`,
+		`  Stations: ${diff.stationCoverage.stationsInBoth} stations compared (0 missing, 0 new)`,
 	];
 
 	if (diff.stationCoverage.stationsOnlyInBefore.length > 0) {
@@ -141,8 +142,11 @@ export function formatBoardDiff(
 		const added = diff.unparsedTrips.after.filter((id) => !beforeSet.has(id));
 		const removed = diff.unparsedTrips.before.filter((id) => !afterSet.has(id));
 		if (added.length > 0 || removed.length > 0) {
+			const parts: string[] = [];
+			if (added.length > 0) parts.push(`${added.length} added`);
+			if (removed.length > 0) parts.push(`${removed.length} removed`);
 			lines.push(
-				`  Unparsed / Non-standard Identifiers (+${added.length}/-${removed.length}):`,
+				`  Unparsed / Non-standard Identifiers (${parts.join(", ")}):`,
 			);
 			const limit = options.detail ? added.length : 10;
 			for (let i = 0; i < limit && i < added.length; i++) {

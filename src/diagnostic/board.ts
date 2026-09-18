@@ -107,17 +107,18 @@ export function diffDepartureBoards(
 
 	let coverageNotice = "";
 	if (stationsOnlyInBefore.length > 0 && stationsOnlyInAfter.length > 0) {
-		coverageNotice = ` [Coverage: -${stationsOnlyInBefore.length}/+${stationsOnlyInAfter.length} stations]`;
+		coverageNotice = ` [Coverage: ${stationsOnlyInBefore.length} missing, ${stationsOnlyInAfter.length} new stations]`;
 	} else if (stationsOnlyInBefore.length > 0) {
 		const list = stationsOnlyInBefore.slice(0, 3).join(", ");
 		const suffix = stationsOnlyInBefore.length > 3 ? "..." : "";
-		coverageNotice = ` [Coverage: -${stationsOnlyInBefore.length} station${stationsOnlyInBefore.length > 1 ? "s" : ""} (missing: ${list}${suffix})]`;
+		const s = stationsOnlyInBefore.length > 1 ? "s" : "";
+		coverageNotice = ` [Coverage: ${stationsOnlyInBefore.length} missing station${s} (${list}${suffix})]`;
 	} else if (stationsOnlyInAfter.length > 0) {
 		const list = stationsOnlyInAfter.slice(0, 3).join(", ");
 		const suffix = stationsOnlyInAfter.length > 3 ? "..." : "";
-		coverageNotice = ` [Coverage: +${stationsOnlyInAfter.length} station${stationsOnlyInAfter.length > 1 ? "s" : ""} (${list}${suffix})]`;
+		const s = stationsOnlyInAfter.length > 1 ? "s" : "";
+		coverageNotice = ` [Coverage: ${stationsOnlyInAfter.length} new station${s} (${list}${suffix})]`;
 	}
-
 	let unparsedNotice = "";
 	if (unparsedBeforeList.length > 0 || unparsedAfterList.length > 0) {
 		const addedUnparsed = unparsedAfterList.filter(
