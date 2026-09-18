@@ -11,7 +11,8 @@
 		"smoke": "bun scripts/smoke.ts",
 		"analyze:fixtures": "bun scripts/analyze-fixtures.ts",
 		"fetch:holidays": "bun scripts/fetch-holidays.ts",
-		"release:prep": "bun scripts/release-prepare.ts"
+		"release:prep": "bun scripts/release-prepare.ts",
+		"release": "release-it"
 	},
 	"bin": {
 		"krl": "./src/cli/index.ts"
@@ -31,6 +32,7 @@
 		"drizzle-kit": "^1.0.0-rc.4",
 		"fast-check": "^4",
 		"lefthook": "^2.1.14",
+		"release-it": "^21.0.3",
 		"typescript": "^7.0.2"
 	}
 }
