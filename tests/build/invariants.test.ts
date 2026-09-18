@@ -1,5 +1,6 @@
 // tests/build/invariants.test.ts
 import { describe, expect, it } from "bun:test";
+import type { DepartureBoardResponse } from "../../src/api/schemas";
 import {
 	checkBoardItineraryStopCountCongruence,
 	checkBoardItineraryTimeCongruence,
@@ -138,7 +139,25 @@ describe("Build Invariants Suite", () => {
 		expect(checkStationReferentialIntegrity("WIL1", valid)).toBe(false);
 	});
 
-	it("Inv 11: checkEditionConsistency validates station master and board hashes", () => {
+	it("Inv 11: checkEditionConsistency validates station master and board trip sets", () => {
+		const makeBoard = (
+			trainIds: string[],
+		): Map<string, DepartureBoardResponse> => {
+			const board: DepartureBoardResponse = {
+				status: 200,
+				data: trainIds.map((id) => ({
+					train_id: id,
+					ka_name: "KRL",
+					route_name: "TEST",
+					dest: "DST",
+					time_est: "06:00:00",
+					color: "#fff",
+					dest_time: "07:00:00",
+				})),
+			};
+			return new Map([["MRI", board]]);
+		};
+
 		const mockSnaps: RawSnapshot[] = [
 			{
 				id: 1,
@@ -155,7 +174,7 @@ describe("Build Invariants Suite", () => {
 				},
 				archiveCommit: "commit1",
 				stations: { status: 200, message: "OK", data: [] },
-				boards: new Map(),
+				boards: makeBoard(["1001", "1003"]),
 			},
 			{
 				id: 2,
@@ -172,29 +191,34 @@ describe("Build Invariants Suite", () => {
 				},
 				archiveCommit: "commit2",
 				stations: { status: 200, message: "OK", data: [] },
-				boards: new Map(),
+				boards: makeBoard(["1001", "1003"]),
 			},
 		];
 
 		expect(checkEditionConsistency(mockSnaps).valid).toBe(true);
 
-		// Station master divergence
+		// Station master divergence is still a byte-level hard block
 		mockSnaps[1].manifest.station_master_hash = "hashB";
 		const resStnMismatch = checkEditionConsistency(mockSnaps);
 		expect(resStnMismatch.valid).toBe(false);
 		expect(resStnMismatch.reason).toContain("Station master hash divergence");
 
-		// Board hash divergence in same day-type
+		// Parsed trip set divergence in same day-type
 		mockSnaps[1].manifest.station_master_hash = "hashA";
-		mockSnaps[1].manifest.board_response_hash = "boardHash2";
-		const resBoardMismatch = checkEditionConsistency(mockSnaps);
-		expect(resBoardMismatch.valid).toBe(false);
-		expect(resBoardMismatch.reason).toContain(
-			"Board response hash divergence between snapshot 1 and 2",
+		mockSnaps[1].boards = makeBoard(["1001", "9999"]); // 1003 replaced by 9999
+		const resTripMismatch = checkEditionConsistency(mockSnaps);
+		expect(resTripMismatch.valid).toBe(false);
+		expect(resTripMismatch.reason).toContain(
+			"Parsed trip set divergence between snapshot 1 and 2",
 		);
 
-		// Board hash difference between DIFFERENT day-types is allowed (evidence, not divergence)
+		// Unparseable paired IDs (e.g. 801A-802A) must NOT trigger a false positive
+		mockSnaps[1].boards = makeBoard(["1001", "1003", "801A-802A"]);
+		expect(checkEditionConsistency(mockSnaps).valid).toBe(true);
+
+		// Divergence between DIFFERENT day-types is allowed
 		mockSnaps[1].manifest.day_type = "saturday";
+		mockSnaps[1].boards = makeBoard(["9999"]); // completely different trips, different day-type
 		expect(checkEditionConsistency(mockSnaps).valid).toBe(true);
 	});
 
