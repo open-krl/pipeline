@@ -1,5 +1,7 @@
 import * as z from "zod";
 
+export const projectName = "Open-KRL-Pipeline";
+
 export const API_BASE_URL = "https://www.kci.id";
 
 export const API_HEADERS = {

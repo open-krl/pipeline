@@ -1,4 +1,5 @@
 import { itinerariesDir } from "../archive/layout";
+import { projectName } from "../config";
 import { type CommitResult, commitPath } from "../core/git";
 import { resolveSafePath } from "../core/path";
 
@@ -24,7 +25,7 @@ export function formatCensusCommitMessage(
 	options: { coAuthor?: boolean } = {},
 ): string {
 	const coAuthor = options.coAuthor ?? true;
-	const footer = coAuthor ? "\n\nGenerated commit by Open-KRL-Pipeline" : "";
+	const footer = coAuthor ? `\n\nGenerated commit by ${projectName}` : "";
 
 	return `chore(census): record v${params.timetableVersion} itineraries census (${params.totalTrips} trips)
 

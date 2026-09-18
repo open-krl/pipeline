@@ -4,6 +4,7 @@ import {
 	type CaptureManifest,
 	CaptureManifestSchema,
 } from "../archive/schemas";
+import { projectName } from "../config";
 import { type CommitResult, commitPath } from "../core/git";
 import { resolveSafePath } from "../core/path";
 
@@ -23,7 +24,7 @@ export function formatSnapshotCommitMessage(
 	options: { coAuthor?: boolean } = {},
 ): string {
 	const coAuthor = options.coAuthor ?? true;
-	const footer = coAuthor ? "\n\nGenerated commit by Open-KRL-Pipeline" : "";
+	const footer = coAuthor ? `\n\nGenerated commit by ${projectName}` : "";
 
 	return `chore(capture): record v${manifest.timetable_version} snapshot ${manifest.snapshot_id} (${manifest.day_type}, ${manifest.status})
 

@@ -3,6 +3,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import * as z from "zod";
+import { projectName } from "../src/config";
 
 const HolidayApiItemSchema = z.object({
 	date: z
@@ -60,7 +61,7 @@ async function main() {
 
 	const response = await fetch(endpoint, {
 		headers: {
-			"User-Agent": "Open-KRL-Pipeline/1.5 (github.com/invictus-navarchus)",
+			"User-Agent": `${projectName}/1.5 (github.com/invictus-navarchus)`,
 			Accept: "application/json",
 		},
 	});
