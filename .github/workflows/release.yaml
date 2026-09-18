@@ -1,0 +1,89 @@
+name: Release & Publish GTFS
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      timetable_version:
+        description: "Timetable Version to compile (optional; defaults to latest on disk)"
+        required: false
+        type: string
+      allow_provisional:
+        description: "Allow provisional calendar (<3 day types)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    name: Build & Publish Release
+    runs-on: ubuntu-26.04
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Need full git history for snapshot archive commit resolution
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.x
+
+      - name: Install Dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Compile Database and GTFS Package
+        id: prep
+        run: |
+          VERSION_FLAG=""
+          if [ -n "${{ inputs.timetable_version }}" ]; then
+            VERSION_FLAG="${{ inputs.timetable_version }}"
+          fi
+
+          FLAGS=""
+          if [ "${{ inputs.allow_provisional }}" = "true" ]; then
+            FLAGS="--allow-provisional"
+          fi
+
+          bun run scripts/prepare-release.ts $VERSION_FLAG $FLAGS
+
+          # Find generated files under data/build
+          DB_FILE=$(ls data/build/krl_v*.db | head -n 1)
+          ZIP_FILE=$(ls data/build/krl_gtfs_v*.zip | head -n 1)
+          SHA_FILE="${ZIP_FILE}.sha256"
+          NOTES_FILE=$(ls data/build/RELEASE_NOTES_v*.md | head -n 1)
+
+          echo "db_file=$DB_FILE" >> $GITHUB_OUTPUT
+          echo "zip_file=$ZIP_FILE" >> $GITHUB_OUTPUT
+          echo "sha_file=$SHA_FILE" >> $GITHUB_OUTPUT
+          echo "notes_file=$NOTES_FILE" >> $GITHUB_OUTPUT
+
+      - name: Determine Release Tag & Name
+        id: release_meta
+        run: |
+          if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+          else
+            TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
+            TAG_NAME="release-${TIMESTAMP}"
+          fi
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release & Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag_name }}
+          name: KRL Timetable Release (${{ steps.release_meta.outputs.tag_name }})
+          body_path: ${{ steps.prep.outputs.notes_file }}
+          draft: false
+          prerelease: ${{ inputs.allow_provisional || false }}
+          files: |
+            ${{ steps.prep.outputs.zip_file }}
+            ${{ steps.prep.outputs.sha_file }}
+            ${{ steps.prep.outputs.db_file }}
