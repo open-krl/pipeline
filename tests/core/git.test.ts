@@ -45,9 +45,7 @@ describe("src/core/git", () => {
 		expect(message).toContain("Board Hash:    1234567890abcdef...");
 		expect(message).toContain("Status:        complete");
 		expect(message).toContain("Generated with Antigravity");
-		expect(message).toContain(
-			"Co-authored-by: gemini-code-assist[bot] <176961590+gemini-code-assist[bot]@users.noreply.github.com>",
-		);
+		expect(message).toContain("Generated commit by Open-KRL-Pipeline");
 	});
 
 	it("formats snapshot commit message without co-author when disabled", () => {

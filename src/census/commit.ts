@@ -24,9 +24,7 @@ export function formatCensusCommitMessage(
 	options: { coAuthor?: boolean } = {},
 ): string {
 	const coAuthor = options.coAuthor ?? true;
-	const footer = coAuthor
-		? "\n\nGenerated with Antigravity\nCo-authored-by: gemini-code-assist[bot] <176961590+gemini-code-assist[bot]@users.noreply.github.com>"
-		: "";
+	const footer = coAuthor ? "\n\nGenerated commit by Open-KRL-Pipeline" : "";
 
 	return `chore(census): record v${params.timetableVersion} itineraries census (${params.totalTrips} trips)
 
