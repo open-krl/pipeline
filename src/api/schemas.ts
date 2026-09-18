@@ -2,7 +2,7 @@
 import * as z from "zod";
 
 // ─── Station Master Schemas ──────────────────────────────────────────────────
-export const StationItemSchema = z.object({
+const StationItemSchema = z.object({
 	sta_id: z.string().min(1),
 	sta_name: z.string().min(1),
 	group_wil: z.number().int(),
@@ -18,7 +18,7 @@ export const StationMasterResponseSchema = z.object({
 export type StationMasterResponse = z.infer<typeof StationMasterResponseSchema>;
 
 // ─── Departure Board Schemas ─────────────────────────────────────────────────
-export const DepartureBoardItemSchema = z.object({
+const DepartureBoardItemSchema = z.object({
 	train_id: z.string().min(1),
 	ka_name: z.string().min(1),
 	route_name: z.string().min(1),

@@ -13,8 +13,8 @@ export interface BoardOccurrence {
 	time_est: string;
 }
 
-export const DEAD_BAND_START_SECS = 5400; // 01:30:00
-export const DEAD_BAND_END_SECS = DEAD_BAND_CUTOFF_SECS; // 12600 (03:30:00)
+const DEAD_BAND_START_SECS = 5400; // 01:30:00
+const DEAD_BAND_END_SECS = DEAD_BAND_CUTOFF_SECS; // 12600 (03:30:00)
 
 /**
  * Invariant 1: Intra-Trip Attribute Consistency
@@ -213,7 +213,7 @@ export function checkStationReferentialIntegrity(
  * Invariant 10: Atomic Capture Integrity
  * Degraded captures are barred from build.
  */
-export function checkAtomicCaptureIntegrity(manifestStatus: string): boolean {
+function checkAtomicCaptureIntegrity(manifestStatus: string): boolean {
 	return manifestStatus === "complete";
 }
 

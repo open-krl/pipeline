@@ -23,7 +23,7 @@ export interface CatalogDiff {
 /**
  * Trip-level classification for board departures (§4.1, Invariant 8, Invariant 11).
  */
-export type TripChangeClassification =
+type TripChangeClassification =
 	| "identical"
 	| "relettered"
 	| "retimed"
@@ -72,11 +72,7 @@ export interface BoardDiff {
 /**
  * Stop-level itinerary difference (§9 Stratified Spot-Check, Invariant 4).
  */
-export type ItineraryStopChangeStatus =
-	| "unchanged"
-	| "retimed"
-	| "added"
-	| "removed";
+type ItineraryStopChangeStatus = "unchanged" | "retimed" | "added" | "removed";
 
 export interface ItineraryStopDiff {
 	stationId: string;

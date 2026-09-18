@@ -109,7 +109,7 @@ export interface CalendarDateRow {
 	exception_type: number; // 1 = added, 2 = removed
 }
 
-export interface FeedData {
+interface FeedData {
 	agency: AgencyRow[];
 	stops: StopRow[];
 	routes: RouteRow[];

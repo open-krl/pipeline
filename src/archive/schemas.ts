@@ -4,16 +4,14 @@ import { ItineraryStopSchema } from "../api/schemas";
 import {
 	type DayType,
 	DayTypeSchema,
-	HolidayFileSchema,
 	type HolidayItem,
-	HolidayItemSchema,
 } from "../core/calendar";
 
 export type { DayType, HolidayItem };
-export { DayTypeSchema, HolidayFileSchema, HolidayItemSchema };
+export { DayTypeSchema };
 
 // ─── Multi-Observation Itinerary Storage Schema (§8.3) ──────────────────────
-export const ItineraryObservationSchema = z.object({
+const ItineraryObservationSchema = z.object({
 	fetched_at: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/, {
 		error: "Expected ISO-8601 UTC timestamp",
 	}),

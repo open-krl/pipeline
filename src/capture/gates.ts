@@ -27,7 +27,7 @@ export interface Gate1Result {
 	shouldBumpVersion: boolean;
 }
 
-export type Gate2Verdict = "accept" | "bump" | "quit";
+type Gate2Verdict = "accept" | "bump" | "quit";
 
 export interface Gate2Params {
 	dataDir: string;

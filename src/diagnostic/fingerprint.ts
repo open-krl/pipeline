@@ -4,7 +4,7 @@ import { toServiceDaySecs } from "../core/time";
 import { parseTrainId } from "../core/trainid";
 import type { BoardDiffTripItem } from "./types";
 
-export interface TripDepartureStop {
+interface TripDepartureStop {
 	stationId: string;
 	depSecs: number;
 	timeEst: string;

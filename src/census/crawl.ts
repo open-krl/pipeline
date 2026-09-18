@@ -10,7 +10,7 @@ import { payloadHash } from "../core/canonical";
 import { type StructuredLogger, startTimer } from "../core/logger";
 import type { CensusProgress } from "./context";
 
-export type ProbeOutcome =
+type ProbeOutcome =
 	| {
 			status: "ok";
 			trainId: string;

@@ -11,7 +11,7 @@ export const DayTypeSchema = z.enum([
 export type DayType = z.infer<typeof DayTypeSchema>;
 
 // ─── Holiday File Schema ─────────────────────────────────────────────────────
-export const HolidayItemSchema = z.object({
+const HolidayItemSchema = z.object({
 	holiday_date: z
 		.string()
 		.regex(/^\d{4}-\d{2}-\d{2}$/, { error: "Expected YYYY-MM-DD" }),

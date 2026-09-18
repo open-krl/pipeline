@@ -2,7 +2,8 @@
 import { DEAD_BAND_CUTOFF_SECS } from "../config";
 
 export { DEAD_BAND_CUTOFF_SECS };
-export const SECONDS_IN_DAY = 86400;
+
+const SECONDS_IN_DAY = 86400;
 
 /**
  * Parses an 'HH:MM:SS' time string into seconds elapsed since 00:00:00 (0..86399).

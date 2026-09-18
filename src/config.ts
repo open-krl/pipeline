@@ -69,7 +69,7 @@ export const CORRIDOR_REFERENCE_STATIONS = {
  *    returns 404 for `GGL`, train itinerary stops (`/api/krl/train-schedule`) emit `GRG`, and
  *    official KCI published timetable PDFs print `GRG`.
  */
-export const STATION_CODE_OVERRIDES: Readonly<Record<string, string>> = {
+const STATION_CODE_OVERRIDES: Readonly<Record<string, string>> = {
 	GGL: "GRG",
 };
 
@@ -83,7 +83,7 @@ export const STATION_CODE_OVERRIDES: Readonly<Record<string, string>> = {
  * were updated to emit Stasiun BNI City (`SUDB`), but train 5169D was missed in KCI's backend
  * update and still emitted Stasiun Karet (`KAT`).
  */
-export const TRIP_STATION_OVERRIDES: Readonly<
+const TRIP_STATION_OVERRIDES: Readonly<
 	Record<string, Readonly<Record<string, string>>>
 > = {
 	"5169D": {

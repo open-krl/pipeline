@@ -9,7 +9,7 @@ import { payloadHash } from "../core/canonical";
 import { diffItineraries } from "../diagnostic/itinerary";
 import type { DiscoveredTrain } from "./discovery";
 
-export interface StratifiedDivergence {
+interface StratifiedDivergence {
 	stratum: string;
 	trainId: string;
 	baselineDayType: DayType;

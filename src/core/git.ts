@@ -6,7 +6,7 @@ import { resolveSafePath } from "./path";
 
 const execFileAsync = promisify(execFile);
 
-export interface GitExecOptions {
+interface GitExecOptions {
 	cwd?: string;
 }
 

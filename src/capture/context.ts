@@ -71,4 +71,4 @@ export function resolveCaptureContext(options: CaptureOptions) {
 	};
 }
 
-export type CaptureContext = ReturnType<typeof resolveCaptureContext>;
+type CaptureContext = ReturnType<typeof resolveCaptureContext>;

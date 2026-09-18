@@ -14,13 +14,13 @@ export interface DiagnosticBaselineOptions {
 	preferSource?: "database" | "snapshots";
 }
 
-export interface DatabaseBaseline {
+interface DatabaseBaseline {
 	source: "database";
 	version: number;
 	dbPath: string;
 }
 
-export interface SnapshotsBaseline {
+interface SnapshotsBaseline {
 	source: "snapshots";
 	version: number;
 	dataDir: string;

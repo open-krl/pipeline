@@ -25,7 +25,7 @@ export interface ListSnapshotsOptions {
 /**
  * Resolves the latest git commit affecting a snapshot directory.
  */
-export async function resolveSnapshotCommit(
+async function resolveSnapshotCommit(
 	snapshotDir: string,
 	cwd = process.cwd(),
 ): Promise<string | null> {

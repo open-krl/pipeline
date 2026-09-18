@@ -29,7 +29,7 @@ export interface LoadArchiveOptions {
 /**
  * Parses data/station_coordinates.csv into a Map of sta_id -> { lat, lon }.
  */
-export async function loadStationCoordinates(
+async function loadStationCoordinates(
 	csvPath: string,
 ): Promise<Map<string, { lat: number; lon: number }>> {
 	const map = new Map<string, { lat: number; lon: number }>();
@@ -59,9 +59,7 @@ export async function loadStationCoordinates(
 /**
  * Parses data/holidays.json into an array of HolidayItem.
  */
-export async function loadHolidays(
-	holidaysPath: string,
-): Promise<HolidayItem[]> {
+async function loadHolidays(holidaysPath: string): Promise<HolidayItem[]> {
 	try {
 		const content = await fs.readFile(holidaysPath, "utf-8");
 		const parsed = JSON.parse(content);

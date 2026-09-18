@@ -2,7 +2,7 @@
 import { toServiceDaySecs } from "../core/time";
 import type { BoardOccurrence } from "./invariants";
 
-export interface ReconstructedStop {
+interface ReconstructedStop {
 	stop_sequence: number;
 	station_id: string;
 	time_raw: string;

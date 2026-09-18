@@ -12,10 +12,7 @@ export interface StationEntity {
 /**
  * Validates that latitude and longitude are finite numbers within standard WGS-84 bounds.
  */
-export function isValidCoordinate(
-	lat: number | null,
-	lon: number | null,
-): boolean {
+function isValidCoordinate(lat: number | null, lon: number | null): boolean {
 	return (
 		lat !== null &&
 		lon !== null &&

@@ -5,7 +5,7 @@ import { resolveSafePath } from "./path";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
-export const LOG_LEVEL_SEVERITY: Record<LogLevel, number> = {
+const LOG_LEVEL_SEVERITY: Record<LogLevel, number> = {
 	debug: 10,
 	info: 20,
 	warn: 30,
