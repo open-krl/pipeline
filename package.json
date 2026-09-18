@@ -12,7 +12,8 @@
 		"analyze:fixtures": "bun scripts/analyze-fixtures.ts",
 		"fetch:holidays": "bun scripts/fetch-holidays.ts",
 		"release:prep": "bun scripts/release-prepare.ts",
-		"release": "release-it"
+		"release": "release-it",
+		"knip": "knip"
 	},
 	"bin": {
 		"krl": "./src/cli/index.ts"
@@ -28,9 +29,10 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.5.13",
 		"@types/bun": "^1.4.2",
-		"@types/node": "^22.20.3",
+		"@types/node": "^26.6.1",
 		"drizzle-kit": "^1.0.0-rc.4",
 		"fast-check": "^4",
+		"knip": "^6.36.0",
 		"lefthook": "^2.1.14",
 		"release-it": "^21.0.3",
 		"typescript": "^7.0.2"
