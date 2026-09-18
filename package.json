@@ -12,6 +12,9 @@
 		"analyze:fixtures": "bun scripts/analyze-fixtures.ts",
 		"fetch:holidays": "bun scripts/fetch-holidays.ts"
 	},
+	"bin": {
+		"krl": "./src/cli/index.ts"
+	},
 	"dependencies": {
 		"cac": "^7.0.0",
 		"drizzle-orm": "^1.0.0-rc.4",
