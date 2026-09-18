@@ -10,7 +10,8 @@
 		"typecheck": "tsc --noEmit",
 		"smoke": "bun scripts/smoke.ts",
 		"analyze:fixtures": "bun scripts/analyze-fixtures.ts",
-		"fetch:holidays": "bun scripts/fetch-holidays.ts"
+		"fetch:holidays": "bun scripts/fetch-holidays.ts",
+		"release:prep": "bun scripts/release-prepare.ts"
 	},
 	"bin": {
 		"krl": "./src/cli/index.ts"
