@@ -106,18 +106,18 @@ data/
 The `build` phase verifies 13 structural invariants before accepting a dataset:
 
 1. **Intra-trip board consistency**: Identical route names, destinations, and colors across all appearances of a train in a capture.
-2. **Minimum board occurrences**: Every valid train must appear on $\ge 2$ station boards.
+2. **Minimum board occurrences**: Every valid train must appear on ≥ 2 station boards.
 3. **Dead-band assertion**: Zero scheduled departures network-wide between 01:30:00 and 03:30:00.
-4. **Board-itinerary time congruence**: Board departure minutes must match itinerary stop times within $\pm 60$s.
+4. **Board-itinerary time congruence**: Board departure minutes must match itinerary stop times within ±60s.
 5. **Terminus alignment**: Final scheduled itinerary stop must match trip destination and arrival time.
 6. **Stop monotonicity**: Non-decreasing service-day seconds across sequential stops.
 7. **Identifier grammar**: Train IDs must match `^(\d+)([A-E])?(F)?$` (invalid IDs quarantined).
-8. **Suffix transition bounds**: Revision drift must increment by $\le 1$ ASCII character.
+8. **Suffix transition bounds**: Revision drift must increment by ≤ 1 ASCII character.
 9. **Referential integrity**: All station IDs must resolve to non-header catalog stations.
 10. **Atomic capture integrity**: Degraded capture runs are barred from build.
 11. **Cross-capture edition consistency**: Captures within a version must share identical station master hashes. Same-day-type captures must share an identical canonical parsed trip set (unparseable identifiers excluded — they are quarantined by Invariant 7 and have no effect on the build).
 12. **Cross-capture trip attribute consistency**: Attributes for the same `trip_id` must match across captures.
-13. **Board-itinerary stop count congruence**: Number of board departure rows must equal $\text{total\_stops} - 1$.
+13. **Board-itinerary stop count congruence**: Number of board departure rows must equal `total_stops` - 1.
 
 ---
 
