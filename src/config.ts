@@ -24,7 +24,7 @@ export const CONCURRENCY = {
 	censusItineraries: 3,
 } as const;
 
-export const PACING_MS = 500;
+export const PACING_MS = 1000;
 
 export const RETRY = {
 	baseMs: 1000,
