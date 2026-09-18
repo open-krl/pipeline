@@ -245,7 +245,7 @@ describe("Semantic Diff Engine — Trip Fingerprinting & Departure Boards", () =
 		});
 
 		expect(diff.stationCoverage.stationsOnlyInBefore).toEqual(["PSM"]);
-		expect(diff.summary).toContain("[Coverage: -1 station (missing: PSM)]");
+		expect(diff.summary).toContain("[Coverage: 1 missing station (PSM)]");
 	});
 
 	it("treats reused train_id with divergent destination or zero common stops as withdrawn and added", () => {
