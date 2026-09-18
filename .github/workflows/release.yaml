@@ -51,7 +51,7 @@ jobs:
             FLAGS="--allow-provisional"
           fi
 
-          bun run scripts/prepare-release.ts $VERSION_FLAG $FLAGS
+          bun run scripts/release-prepare.ts $VERSION_FLAG $FLAGS
 
           # Find generated files under data/build
           DB_FILE=$(ls data/build/krl_v*.db | head -n 1)
