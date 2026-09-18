@@ -218,9 +218,31 @@ export function checkAtomicCaptureIntegrity(manifestStatus: string): boolean {
 }
 
 /**
+ * Derives the canonical trip set from a snapshot's boards: the sorted,
+ * deduplicated collection of grammar-conforming trip IDs across all stations.
+ * Unparseable identifiers (e.g. paired-set IDs like "801A-802A") are excluded
+ * because they are quarantined by Invariant 7 and have no effect on the build.
+ */
+function canonicalTripSet(snap: RawSnapshot): string {
+	const ids = new Set<string>();
+	for (const board of snap.boards.values()) {
+		for (const row of board.data) {
+			if (parseTrainId(row.train_id) !== null) {
+				ids.add(row.train_id);
+			}
+		}
+	}
+	return [...ids].sort().join(",");
+}
+
+/**
  * Invariant 11: Cross-Capture Edition Consistency
  * - All complete captures within the version share an identical station_master_hash.
- * - Same-day-type captures share an identical board_response_hash.
+ * - Same-day-type captures share an identical canonical parsed trip set
+ *   (sorted, deduplicated grammar-conforming train IDs). Raw board_response_hash
+ *   is intentionally not compared here: non-semantic payload differences such as
+ *   KCI emitting unparseable paired identifiers (e.g. "801A-802A") diverge the
+ *   raw hash without changing the effective timetable.
  */
 export function checkEditionConsistency(snapshots: RawSnapshot[]): {
 	valid: boolean;
@@ -231,10 +253,10 @@ export function checkEditionConsistency(snapshots: RawSnapshot[]): {
 	}
 
 	const baseStationHash = snapshots[0].manifest.station_master_hash;
-	const dayTypeBoardHashes = new Map<string, { id: number; hash: string }>();
+	const dayTypeTripSets = new Map<string, { id: number; tripSet: string }>();
 
 	for (const snap of snapshots) {
-		// Station master hash must be identical across all captures
+		// Station master hash must be identical across all captures (byte-level guard)
 		if (snap.manifest.station_master_hash !== baseStationHash) {
 			return {
 				valid: false,
@@ -242,19 +264,20 @@ export function checkEditionConsistency(snapshots: RawSnapshot[]): {
 			};
 		}
 
-		// Within-day-type board response hash equality
-		const prev = dayTypeBoardHashes.get(snap.manifest.day_type);
+		// Within-day-type: canonical parsed trip sets must be identical
+		const tripSet = canonicalTripSet(snap);
+		const prev = dayTypeTripSets.get(snap.manifest.day_type);
 		if (prev) {
-			if (prev.hash !== snap.manifest.board_response_hash) {
+			if (prev.tripSet !== tripSet) {
 				return {
 					valid: false,
-					reason: `Board response hash divergence between snapshot ${prev.id} and ${snap.id} for day type '${snap.manifest.day_type}' (${prev.hash.slice(0, 8)} vs ${snap.manifest.board_response_hash.slice(0, 8)})`,
+					reason: `Parsed trip set divergence between snapshot ${prev.id} and ${snap.id} for day type '${snap.manifest.day_type}'`,
 				};
 			}
 		} else {
-			dayTypeBoardHashes.set(snap.manifest.day_type, {
+			dayTypeTripSets.set(snap.manifest.day_type, {
 				id: snap.id,
-				hash: snap.manifest.board_response_hash,
+				tripSet,
 			});
 		}
 	}

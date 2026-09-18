@@ -19,7 +19,7 @@ export async function executeBuild(
 	// 1. Load RawArchive from disk
 	const archive = await loadRawArchive(options);
 
-	// 2. Validate Invariant 11: Cross-Capture Edition Consistency
+	// 2. Validate Invariant 11: Cross-Capture Edition Consistency (semantic parsed-trip-set check)
 	const editionCheck = checkEditionConsistency(archive.snapshots);
 	if (!editionCheck.valid) {
 		throw new Error(

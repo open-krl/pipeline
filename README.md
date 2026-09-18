@@ -115,7 +115,7 @@ The `build` phase verifies 13 structural invariants before accepting a dataset:
 8. **Suffix transition bounds**: Revision drift must increment by $\le 1$ ASCII character.
 9. **Referential integrity**: All station IDs must resolve to non-header catalog stations.
 10. **Atomic capture integrity**: Degraded capture runs are barred from build.
-11. **Cross-capture edition consistency**: Captures within a version must share identical station master hashes and day-type board hashes.
+11. **Cross-capture edition consistency**: Captures within a version must share identical station master hashes. Same-day-type captures must share an identical canonical parsed trip set (unparseable identifiers excluded — they are quarantined by Invariant 7 and have no effect on the build).
 12. **Cross-capture trip attribute consistency**: Attributes for the same `trip_id` must match across captures.
 13. **Board-itinerary stop count congruence**: Number of board departure rows must equal $\text{total\_stops} - 1$.
 
