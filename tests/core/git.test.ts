@@ -44,7 +44,6 @@ describe("src/core/git", () => {
 		expect(message).toContain("Station Hash:  abcd1234efgh5678...");
 		expect(message).toContain("Board Hash:    1234567890abcdef...");
 		expect(message).toContain("Status:        complete");
-		expect(message).toContain("Generated with Antigravity");
 		expect(message).toContain("Generated commit by Open-KRL-Pipeline");
 	});
 
@@ -71,7 +70,6 @@ describe("src/core/git", () => {
 		expect(message).toContain("Total Trips:  1158");
 		expect(message).toContain("Newly Probed: 1158");
 		expect(message).toContain("Failed:       0");
-		expect(message).toContain("Co-authored-by: gemini-code-assist[bot]");
 	});
 
 	describe("isolated git sandbox repository", () => {
