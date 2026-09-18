@@ -142,7 +142,7 @@ flowchart LR
 ---
 
 ### Milestone 7: Production Hardening & CI/CD ⚪ (Planned)
-- [ ] **Task 7.1: Continuous Integration Workflows**
+- [x] **Task 7.1: Continuous Integration Workflows**
   - GitHub Actions verifying type safety (`tsc --noEmit`), lint/formatting (`biome check`), and unit/integration tests (`bun test`).
-- [ ] **Task 7.2: Distribution & Releases**
+- [x] **Task 7.2: Distribution & Releases**
   - GitHub Releases publishing compiled SQLite database (`krl_v<version>.db`) and validated GTFS package (`krl_gtfs_v<version>.zip`).
