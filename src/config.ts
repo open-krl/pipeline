@@ -1,5 +1,8 @@
 import * as z from "zod";
 
+import packageJson from "../package.json" with { type: "json" };
+export const projectVersion = packageJson.version;
+
 export const projectName = "Open-KRL-Pipeline";
 
 export const API_BASE_URL = "https://www.kci.id";
