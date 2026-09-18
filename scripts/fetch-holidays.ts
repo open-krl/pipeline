@@ -60,7 +60,7 @@ async function main() {
 
 	const response = await fetch(endpoint, {
 		headers: {
-			"User-Agent": "KRL-Schedule-Pipeline/1.5 (github.com/invictus-navarchus)",
+			"User-Agent": "Open-KRL-Pipeline/1.5 (github.com/invictus-navarchus)",
 			Accept: "application/json",
 		},
 	});
