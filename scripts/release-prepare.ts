@@ -299,9 +299,17 @@ async function prepareRelease(
 if (import.meta.main) {
 	const args = process.argv.slice(2);
 
-	// Parse positional version argument
+	// Parse --out-dir (before filtering positionals so its value isn't
+	// mistaken for the version argument)
+	const outDirIdx = args.indexOf("--out-dir");
+	const outDir = outDirIdx !== -1 ? args[outDirIdx + 1] : undefined;
+
+	// Parse positional version argument, excluding the --out-dir value
 	let versionArg: number | undefined;
-	const positionalArgs = args.filter((a) => !a.startsWith("--"));
+	const outDirValueIdx = outDirIdx !== -1 ? outDirIdx + 1 : -1;
+	const positionalArgs = args.filter(
+		(a, i) => !a.startsWith("--") && i !== outDirValueIdx,
+	);
 	if (positionalArgs.length > 0) {
 		versionArg = parseStrictVersion(positionalArgs[0]);
 		if (versionArg === undefined) {
@@ -315,10 +323,6 @@ if (import.meta.main) {
 	// Parse flags
 	const allowProvisional = args.includes("--allow-provisional");
 	const allowIncompleteCensus = args.includes("--allow-incomplete-census");
-
-	// Parse --out-dir
-	const outDirIdx = args.indexOf("--out-dir");
-	const outDir = outDirIdx !== -1 ? args[outDirIdx + 1] : undefined;
 
 	prepareRelease({
 		version: versionArg,
