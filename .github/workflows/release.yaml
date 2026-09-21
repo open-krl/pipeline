@@ -67,7 +67,8 @@ jobs:
           fi
 
           echo "Running: bun run scripts/release-prepare.ts $VERSION_FLAG $FLAGS"
-          bun run scripts/release-prepare.ts $VERSION_FLAG $FLAGS
+          bun run scripts/release-prepare.ts $VERSION_FLAG $FLAGS \
+            | tee /tmp/release-prep-output.txt
 
           # --- Discover artifacts deterministically ---
           # The release-prepare script prints "ARTIFACT_VERSION=<n>" on stdout.
