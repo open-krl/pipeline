@@ -65,6 +65,14 @@ export function getDayOfWeekWib(date: Date): number {
 	}
 }
 
+export function getDayOfWeekWibName(date: Date): string {
+	const formatter = new Intl.DateTimeFormat("en-US", {
+		timeZone: TIMEZONE,
+		weekday: "long",
+	});
+	return formatter.format(date);
+}
+
 /**
  * Resolves the operational day type (weekday | saturday | sunday | holiday)
  * for a given timestamp evaluated strictly under the Asia/Jakarta calendar (§4.5).
