@@ -1,0 +1,11 @@
+{
+  "timetable_version": 1,
+  "snapshot_id": 8,
+  "snapshot_date": "2026-09-21",
+  "day_type": "weekday",
+  "region_scope": "jabodetabek",
+  "station_master_hash": "1a8b1bc1b79ec7ec81ee5bacf17fe7644d381404663415de6df56ca9829235fd",
+  "board_response_hash": "9c824b8d3d7483130622e9be3fafd1dd2085a24ed003ab2d9db3f71e76e59c9c",
+  "fetched_at": "2026-09-21T12:08:25Z",
+  "status": "provisional"
+}
