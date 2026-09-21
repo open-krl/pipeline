@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       timetable_version:
-        description: "Timetable Version to compile (optional; defaults to latest on disk)"
+        description: "Timetable version to compile (digits only; defaults to latest on disk)"
         required: false
         type: string
       allow_provisional:
@@ -19,6 +19,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build-and-publish:
     name: Build & Publish Release
@@ -28,7 +32,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Need full git history for snapshot archive commit resolution
+          fetch-depth: 0 # Full git history for archive_commit resolution
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -40,40 +44,81 @@ jobs:
 
       - name: Compile Database and GTFS Package
         id: prep
+        env:
+          TT_VERSION: ${{ inputs.timetable_version }}
+          ALLOW_PROVISIONAL: ${{ inputs.allow_provisional }}
         run: |
+          set -euo pipefail
+
+          # --- Validate timetable_version (digits only, max 6 digits) ---
           VERSION_FLAG=""
-          if [ -n "${{ inputs.timetable_version }}" ]; then
-            VERSION_FLAG="${{ inputs.timetable_version }}"
+          if [ -n "$TT_VERSION" ]; then
+            if ! [[ "$TT_VERSION" =~ ^[0-9]{1,6}$ ]]; then
+              echo "::error::Invalid timetable_version '${TT_VERSION}'. Must be 1–6 digits."
+              exit 1
+            fi
+            VERSION_FLAG="$TT_VERSION"
           fi
 
+          # --- Build flags ---
           FLAGS=""
-          if [ "${{ inputs.allow_provisional }}" = "true" ]; then
+          if [ "$ALLOW_PROVISIONAL" = "true" ]; then
             FLAGS="--allow-provisional"
           fi
 
+          echo "Running: bun run scripts/release-prepare.ts $VERSION_FLAG $FLAGS"
           bun run scripts/release-prepare.ts $VERSION_FLAG $FLAGS
 
-          # Find generated files under data/build
-          DB_FILE=$(ls data/build/krl_v*.db | head -n 1)
-          ZIP_FILE=$(ls data/build/krl_gtfs_v*.zip | head -n 1)
-          SHA_FILE="${ZIP_FILE}.sha256"
-          NOTES_FILE=$(ls data/build/RELEASE_NOTES_v*.md | head -n 1)
+          # --- Discover artifacts deterministically ---
+          # The release-prepare script prints "ARTIFACT_VERSION=<n>" on stdout.
+          RESOLVED_VERSION=$(grep -oP 'ARTIFACT_VERSION=\K[0-9]+' /tmp/release-prep-output.txt || true)
 
-          echo "db_file=$DB_FILE" >> $GITHUB_OUTPUT
-          echo "zip_file=$ZIP_FILE" >> $GITHUB_OUTPUT
-          echo "sha_file=$SHA_FILE" >> $GITHUB_OUTPUT
-          echo "notes_file=$NOTES_FILE" >> $GITHUB_OUTPUT
+          if [ -z "$RESOLVED_VERSION" ]; then
+            # Fallback: parse from the script's own stdout captured above
+            RESOLVED_VERSION=$(grep -oP 'Timetable Edition: v\K[0-9]+' /tmp/release-prep-output.txt || echo "")
+          fi
+
+          if [ -z "$RESOLVED_VERSION" ]; then
+            echo "::error::Could not determine resolved timetable version from build output."
+            exit 1
+          fi
+
+          DB_FILE="data/build/krl_v${RESOLVED_VERSION}.db"
+          ZIP_FILE="data/build/krl_gtfs_v${RESOLVED_VERSION}.zip"
+          SHA_FILE="${ZIP_FILE}.sha256"
+          NOTES_FILE="data/build/RELEASE_NOTES_v${RESOLVED_VERSION}.md"
+
+          # --- Verify all artifacts exist ---
+          for f in "$DB_FILE" "$ZIP_FILE" "$SHA_FILE" "$NOTES_FILE"; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Expected artifact not found: $f"
+              exit 1
+            fi
+          done
+
+          echo "db_file=$DB_FILE" >> "$GITHUB_OUTPUT"
+          echo "zip_file=$ZIP_FILE" >> "$GITHUB_OUTPUT"
+          echo "sha_file=$SHA_FILE" >> "$GITHUB_OUTPUT"
+          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+          echo "resolved_version=$RESOLVED_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Determine Release Tag & Name
         id: release_meta
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          REF: ${{ github.ref }}
+          RESOLVED_VERSION: ${{ steps.prep.outputs.resolved_version }}
         run: |
-          if [ -n "${{ github.ref_name }}" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG_NAME="${{ github.ref_name }}"
+          set -euo pipefail
+
+          if [[ "$REF" == refs/tags/* ]]; then
+            TAG_NAME="$REF_NAME"
           else
             TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
-            TAG_NAME="release-${TIMESTAMP}"
+            TAG_NAME="release-v${RESOLVED_VERSION}-${TIMESTAMP}"
           fi
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+          echo "tag_name=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release & Upload Assets
         uses: softprops/action-gh-release@v2
@@ -82,7 +127,7 @@ jobs:
           name: KRL Timetable Release (${{ steps.release_meta.outputs.tag_name }})
           body_path: ${{ steps.prep.outputs.notes_file }}
           draft: false
-          prerelease: ${{ inputs.allow_provisional || false }}
+          prerelease: ${{ inputs.allow_provisional == true }}
           files: |
             ${{ steps.prep.outputs.zip_file }}
             ${{ steps.prep.outputs.sha_file }}
