@@ -9,8 +9,8 @@ import { drizzle } from "drizzle-orm/bun-sqlite";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import fc from "fast-check";
 import * as z from "zod";
-import { initDb } from "../src/db/connection";
-import * as schema from "../src/db/tables";
+import { initDb } from "@/db/connection";
+import * as schema from "@/db/tables";
 
 let failed = 0;
 const check = async (name: string, fn: () => Promise<void> | void) => {

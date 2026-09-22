@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import * as z from "zod";
-import { projectName, projectVersion } from "../src/config";
+import { projectName, projectVersion } from "@/config";
 
 const HolidayApiItemSchema = z.object({
 	date: z

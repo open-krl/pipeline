@@ -1,6 +1,6 @@
 // scripts/fetch-station-coordinates.ts
 import { writeFileSync } from "node:fs";
-import { projectVersion } from "../src/config";
+import { projectVersion } from "@/config";
 
 const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
 

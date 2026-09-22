@@ -21,11 +21,11 @@
 
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { scanTimetableVersions } from "../src/archive/snapshots";
-import { executeBuild } from "../src/build/build";
-import { projectName, projectVersion } from "../src/config";
-import { resolveSafePath } from "../src/core/path";
-import { executeExport } from "../src/export/export";
+import { scanTimetableVersions } from "@/archive/snapshots";
+import { executeBuild } from "@/build/build";
+import { projectName, projectVersion } from "@/config";
+import { resolveSafePath } from "@/core/path";
+import { executeExport } from "@/export/export";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

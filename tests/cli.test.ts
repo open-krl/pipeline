@@ -1,6 +1,6 @@
 // tests/cli.test.ts
 import { describe, expect, it } from "bun:test";
-import { createCli } from "../src/cli";
+import { createCli } from "@/cli";
 
 describe("src/cli — CAC architecture", () => {
 	it("registers all expected commands and upcoming milestone stubs", () => {
