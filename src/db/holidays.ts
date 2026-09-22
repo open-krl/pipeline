@@ -8,7 +8,7 @@ import { HolidayFileSchema, type HolidayItem } from "../core/calendar";
  */
 export function loadHolidays(filePath?: string): HolidayItem[] {
 	const resolvedPath =
-		filePath ?? join(import.meta.dir, "../../data/holidays.json");
+		filePath ?? join(import.meta.dir, "@/data/holidays.json");
 	const rawContent = readFileSync(resolvedPath, "utf8");
 	const parsedJson = JSON.parse(rawContent);
 

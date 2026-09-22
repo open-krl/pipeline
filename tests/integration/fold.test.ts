@@ -7,11 +7,11 @@ import { eq } from "drizzle-orm";
 import {
 	ItineraryResponseSchema,
 	StationMasterResponseSchema,
-} from "../../src/api/schemas";
-import { parseHMS, resolveItinerarySecs } from "../../src/core/time";
-import { parseTrainId } from "../../src/core/trainid";
-import { initDb } from "../../src/db/connection";
-import * as schema from "../../src/db/tables";
+} from "@/api/schemas";
+import { parseHMS, resolveItinerarySecs } from "@/core/time";
+import { parseTrainId } from "@/core/trainid";
+import { initDb } from "@/db/connection";
+import * as schema from "@/db/tables";
 
 const FIXTURES_DIR = join(import.meta.dir, "../fixtures");
 

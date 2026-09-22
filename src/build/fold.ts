@@ -1,11 +1,12 @@
 // src/build/fold.ts
+
+import type * as schema from "@/db/tables";
 import type { ItineraryStop } from "../api/schemas";
 import type { DayType } from "../archive/schemas";
 import { resolveStationCode, resolveTripStationCode } from "../config";
 import { resolveStationId } from "../core/route";
 import { resolveItinerarySecs, toServiceDaySecs } from "../core/time";
 import { parseTrainId } from "../core/trainid";
-import type * as schema from "../db/tables";
 import {
 	type BoardOccurrence,
 	checkCrossCaptureTripConsistency,

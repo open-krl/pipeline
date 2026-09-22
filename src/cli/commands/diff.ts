@@ -1,5 +1,5 @@
 import type { CAC } from "cac";
-import { executeDiff } from "../../diagnostic/cli-diff";
+import { executeDiff } from "@/diagnostic/cli-diff";
 import { runAction } from "../shared/run";
 
 interface DiffOptions {

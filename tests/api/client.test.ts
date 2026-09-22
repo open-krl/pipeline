@@ -1,12 +1,8 @@
 // tests/api/client.test.ts
 import { describe, expect, it } from "bun:test";
 import { SchemaValidationError } from "ky";
-import {
-	AsyncSemaphore,
-	type FetchFunction,
-	KciClient,
-} from "../../src/api/client";
-import { StructuredLogger } from "../../src/core/logger";
+import { AsyncSemaphore, type FetchFunction, KciClient } from "@/api/client";
+import { StructuredLogger } from "@/core/logger";
 
 describe("src/api/client - AsyncSemaphore", () => {
 	it("enforces max concurrency limit under concurrent load", async () => {

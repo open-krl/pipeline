@@ -4,35 +4,29 @@ import {
 	DEFAULT_AGENCY_META,
 	formatAgencyCsv,
 	generateAgencyRows,
-} from "../../src/export/tables/agency";
+} from "@/export/tables/agency";
 import {
 	computeServiceId,
 	formatCalendarCsv,
 	generateCalendarRows,
-} from "../../src/export/tables/calendar";
+} from "@/export/tables/calendar";
 import {
 	formatCalendarDatesCsv,
 	generateCalendarDateRows,
-} from "../../src/export/tables/calendar-dates";
+} from "@/export/tables/calendar-dates";
 import {
 	CANONICAL_ROUTES,
 	cleanHexColor,
 	formatRoutesCsv,
 	generateRouteRows,
 	resolveRouteId,
-} from "../../src/export/tables/routes";
+} from "@/export/tables/routes";
 import {
 	formatStopTimesCsv,
 	generateStopTimeRows,
-} from "../../src/export/tables/stop-times";
-import {
-	formatStopsCsv,
-	generateStopRows,
-} from "../../src/export/tables/stops";
-import {
-	formatTripsCsv,
-	generateTripRows,
-} from "../../src/export/tables/trips";
+} from "@/export/tables/stop-times";
+import { formatStopsCsv, generateStopRows } from "@/export/tables/stops";
+import { formatTripsCsv, generateTripRows } from "@/export/tables/trips";
 
 describe("src/export/tables — Table Generators", () => {
 	it("agency: generates valid KCI agency row and formatted CSV", () => {

@@ -1,6 +1,6 @@
 // tests/export/gates.test.ts
 import { describe, expect, it } from "bun:test";
-import { evaluateReleaseGates } from "../../src/export/gates";
+import { evaluateReleaseGates } from "@/export/gates";
 
 describe("src/export/gates — Release Gates", () => {
 	it("--require-resolved-calendar: permits resolved state and halts on provisional", () => {

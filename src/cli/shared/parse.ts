@@ -1,6 +1,6 @@
-import { type DayType, DayTypeSchema } from "../../archive/schemas";
-import { type RegionScope, RegionScopeSchema } from "../../config";
-import { resolveSafePath } from "../../core/path";
+import { type DayType, DayTypeSchema } from "@/archive/schemas";
+import { type RegionScope, RegionScopeSchema } from "@/config";
+import { resolveSafePath } from "@/core/path";
 
 /** Print an error and exit(1). Use for user-facing input validation. */
 export function exitError(message: string): never {

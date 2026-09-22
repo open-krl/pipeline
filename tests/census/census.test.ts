@@ -2,23 +2,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { type FetchFunction, KciClient } from "../../src/api/client";
-import type { DepartureBoardResponse } from "../../src/api/schemas";
+import { type FetchFunction, KciClient } from "@/api/client";
+import type { DepartureBoardResponse } from "@/api/schemas";
 import {
 	readItineraryEnvelope,
 	writeItineraryEnvelope,
-} from "../../src/archive/itineraries";
-import type { CaptureManifest } from "../../src/archive/schemas";
-import { executeCensus } from "../../src/census/census";
-import {
-	type DiscoveredTrain,
-	discoverTrainIds,
-} from "../../src/census/discovery";
+} from "@/archive/itineraries";
+import type { CaptureManifest } from "@/archive/schemas";
+import { executeCensus } from "@/census/census";
+import { type DiscoveredTrain, discoverTrainIds } from "@/census/discovery";
 import {
 	runStratifiedSpotCheck,
 	selectStratifiedSample,
-} from "../../src/census/sample";
-import { payloadHash } from "../../src/core/canonical";
+} from "@/census/sample";
+import { payloadHash } from "@/core/canonical";
 
 const TEST_SCRATCH_DIR = path.resolve(process.cwd(), "scratch/test_census_env");
 

@@ -5,8 +5,8 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { strFromU8, unzipSync } from "fflate";
-import { executeBuild } from "../../src/build/build";
-import { executeExport, normalizeDateToGtfs } from "../../src/export/export";
+import { executeBuild } from "@/build/build";
+import { executeExport, normalizeDateToGtfs } from "@/export/export";
 
 describe("Stage 4 GTFS Export Integration Suite", () => {
 	const testOutDir = path.join(process.cwd(), "scratch/test_gtfs_export");

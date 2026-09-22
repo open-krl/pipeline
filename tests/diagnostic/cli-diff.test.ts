@@ -1,6 +1,6 @@
 // tests/diagnostic/cli-diff.test.ts
 import { describe, expect, it } from "bun:test";
-import { executeDiff, parseSnapshotRef } from "../../src/diagnostic/cli-diff";
+import { executeDiff, parseSnapshotRef } from "@/diagnostic/cli-diff";
 
 describe("CLI Diff Tool — parseSnapshotRef", () => {
 	it("parses combined <version>:<snapshotId> tokens", () => {

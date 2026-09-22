@@ -12,7 +12,7 @@ import {
 	snapshotDir,
 	stationsPath,
 	versionDir,
-} from "../../src/archive/layout";
+} from "@/archive/layout";
 
 describe("src/archive/layout", () => {
 	const baseDir = path.resolve(process.cwd(), "scratch/test_layout");

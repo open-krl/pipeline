@@ -1,5 +1,5 @@
 import type { CAC } from "cac";
-import { formatSnapshotTable, getSnapshotList } from "../../capture/snapshots";
+import { formatSnapshotTable, getSnapshotList } from "@/capture/snapshots";
 import { parseDataDir, parseVersionArg } from "../shared/parse";
 
 export function registerListSnapshotsCommand(cli: CAC): void {

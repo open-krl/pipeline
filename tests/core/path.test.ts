@@ -1,7 +1,7 @@
 // tests/core/path.test.ts
 import { describe, expect, it } from "bun:test";
 import * as path from "node:path";
-import { resolveSafePath } from "../../src/core/path";
+import { resolveSafePath } from "@/core/path";
 
 describe("src/core/path", () => {
 	it("resolves a relative path within the default cwd boundary", () => {

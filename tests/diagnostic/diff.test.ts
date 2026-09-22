@@ -4,17 +4,17 @@ import type {
 	DepartureBoardItem,
 	ItineraryStop,
 	StationItem,
-} from "../../src/api/schemas";
-import { diffDepartureBoards } from "../../src/diagnostic/board";
-import { diffStationCatalogs } from "../../src/diagnostic/catalog";
-import { extractTripSummaries } from "../../src/diagnostic/fingerprint";
+} from "@/api/schemas";
+import { diffDepartureBoards } from "@/diagnostic/board";
+import { diffStationCatalogs } from "@/diagnostic/catalog";
+import { extractTripSummaries } from "@/diagnostic/fingerprint";
 import {
 	formatBoardDiff,
 	formatCatalogDiff,
 	formatItineraryDiff,
-} from "../../src/diagnostic/format";
-import { diffItineraries } from "../../src/diagnostic/itinerary";
-import { diffSnapshots } from "../../src/diagnostic/snapshot";
+} from "@/diagnostic/format";
+import { diffItineraries } from "@/diagnostic/itinerary";
+import { diffSnapshots } from "@/diagnostic/snapshot";
 
 const makeBoard = (items: DepartureBoardItem[]): DepartureBoardItem[] => items;
 

@@ -1,6 +1,6 @@
 // src/export/tables/calendar-dates.ts
 
-import dayjs from "../../lib/dayjs";
+import dayjs from "@/lib/dayjs";
 import { formatCsv } from "../csv";
 import type { CalendarDateRow } from "../types";
 

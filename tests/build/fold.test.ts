@@ -6,9 +6,9 @@ import {
 	type DepartureBoardResponse,
 	DepartureBoardResponseSchema,
 	StationMasterResponseSchema,
-} from "../../src/api/schemas";
-import { foldArchive } from "../../src/build/fold";
-import type { RawArchive, RawSnapshot } from "../../src/build/types";
+} from "@/api/schemas";
+import { foldArchive } from "@/build/fold";
+import type { RawArchive, RawSnapshot } from "@/build/types";
 
 const FIXTURES_DIR = join(import.meta.dir, "../fixtures");
 

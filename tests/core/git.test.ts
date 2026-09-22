@@ -6,18 +6,18 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { promisify } from "node:util";
-import type { CaptureManifest } from "../../src/archive/schemas";
+import type { CaptureManifest } from "@/archive/schemas";
 import {
 	commitCaptureSnapshot,
 	formatSnapshotCommitMessage,
-} from "../../src/capture/commit";
-import { formatCensusCommitMessage } from "../../src/census/commit";
+} from "@/capture/commit";
+import { formatCensusCommitMessage } from "@/census/commit";
 import {
 	commitPath,
 	getGitCommitForPath,
 	getGitCommitHash,
 	isGitRepository,
-} from "../../src/core/git";
+} from "@/core/git";
 
 const execFileAsync = promisify(execFile);
 

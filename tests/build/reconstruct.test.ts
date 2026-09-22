@@ -1,7 +1,7 @@
 // tests/build/reconstruct.test.ts
 import { describe, expect, it } from "bun:test";
-import type { BoardOccurrence } from "../../src/build/invariants";
-import { reconstructFromBoards } from "../../src/build/reconstruct";
+import type { BoardOccurrence } from "@/build/invariants";
+import { reconstructFromBoards } from "@/build/reconstruct";
 
 describe("Topological Reconstruction Suite", () => {
 	it("reconstructs stop sequence chronologically from board departures and appends terminus", () => {

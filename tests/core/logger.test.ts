@@ -7,7 +7,7 @@ import {
 	type LogEntry,
 	StructuredLogger,
 	startTimer,
-} from "../../src/core/logger";
+} from "@/core/logger";
 
 const TEST_LOG_DIR = path.resolve(process.cwd(), "scratch/test_logs");
 

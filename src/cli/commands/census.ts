@@ -1,5 +1,5 @@
 import type { CAC } from "cac";
-import { executeCensus } from "../../census/census";
+import { executeCensus } from "@/census/census";
 import { parseDataDir, parseDayType, parseVersionArg } from "../shared/parse";
 import { printSection } from "../shared/report";
 import { runAction } from "../shared/run";

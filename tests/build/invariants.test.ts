@@ -1,6 +1,6 @@
 // tests/build/invariants.test.ts
 import { describe, expect, it } from "bun:test";
-import type { DepartureBoardResponse } from "../../src/api/schemas";
+import type { DepartureBoardResponse } from "@/api/schemas";
 import {
 	checkBoardItineraryStopCountCongruence,
 	checkBoardItineraryTimeCongruence,
@@ -14,8 +14,8 @@ import {
 	checkStopMonotonicity,
 	checkSuffixTransition,
 	checkTerminusAlignment,
-} from "../../src/build/invariants";
-import type { RawSnapshot } from "../../src/build/types";
+} from "@/build/invariants";
+import type { RawSnapshot } from "@/build/types";
 
 describe("Build Invariants Suite", () => {
 	it("Inv 1: checkIntraTripConsistency passes on matching attributes and catches mismatch", () => {

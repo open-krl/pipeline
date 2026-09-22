@@ -6,12 +6,12 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/bun-sqlite";
-import { StationMasterResponseSchema } from "../../src/api/schemas";
-import { executeBuild } from "../../src/build/build";
-import { foldArchive } from "../../src/build/fold";
-import { persistBuildResult } from "../../src/build/persist";
-import type { RawArchive, RawSnapshot } from "../../src/build/types";
-import * as schema from "../../src/db/tables";
+import { StationMasterResponseSchema } from "@/api/schemas";
+import { executeBuild } from "@/build/build";
+import { foldArchive } from "@/build/fold";
+import { persistBuildResult } from "@/build/persist";
+import type { RawArchive, RawSnapshot } from "@/build/types";
+import * as schema from "@/db/tables";
 
 const FIXTURES_DIR = join(import.meta.dir, "../fixtures");
 const TEST_SCRATCH_DIR = join(process.cwd(), "scratch/test_build_env");

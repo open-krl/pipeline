@@ -2,18 +2,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import {
-	manifestPath,
-	snapshotDir,
-	stationsPath,
-} from "../../src/archive/layout";
-import type { CaptureManifest } from "../../src/archive/schemas";
+import { manifestPath, snapshotDir, stationsPath } from "@/archive/layout";
+import type { CaptureManifest } from "@/archive/schemas";
 import {
 	readSnapshotBoards,
 	readSnapshotStations,
 	scanSnapshots,
 	scanTimetableVersions,
-} from "../../src/archive/snapshots";
+} from "@/archive/snapshots";
 
 const TEST_DATA_DIR = path.resolve(
 	process.cwd(),

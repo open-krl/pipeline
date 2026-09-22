@@ -2,8 +2,8 @@ import type { CAC } from "cac";
 import {
 	analyzeDayTypeCalendar,
 	loadCalendarData,
-} from "../../diagnostic/calendar";
-import { formatCalendarReport } from "../../diagnostic/format";
+} from "@/diagnostic/calendar";
+import { formatCalendarReport } from "@/diagnostic/format";
 import { parseToleranceSecs, parseVersionArg } from "../shared/parse";
 import { runAction } from "../shared/run";
 

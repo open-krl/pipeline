@@ -7,7 +7,7 @@ import path from "node:path";
 import {
 	resolveDiagnosticBaseline,
 	scanCompiledDatabaseVersions,
-} from "../../src/diagnostic/baseline";
+} from "@/diagnostic/baseline";
 
 describe("Diagnostic Baseline Resolver (§9, §12)", () => {
 	it("scans and numerically sorts compiled database versions in build directory", async () => {

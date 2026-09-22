@@ -1,5 +1,5 @@
 import type { CAC } from "cac";
-import { executeBuild } from "../../build/build";
+import { executeBuild } from "@/build/build";
 import { parseVersionArg } from "../shared/parse";
 import { printSection } from "../shared/report";
 import { runAction } from "../shared/run";

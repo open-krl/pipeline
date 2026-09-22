@@ -1,6 +1,6 @@
 // tests/export/csv.test.ts
 import { describe, expect, it } from "bun:test";
-import { escapeCsvField, formatCsv } from "../../src/export/csv";
+import { escapeCsvField, formatCsv } from "@/export/csv";
 
 describe("src/export/csv — RFC 4180 Serializer", () => {
 	it("escapes fields containing commas, quotes, and newlines", () => {

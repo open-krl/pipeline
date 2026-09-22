@@ -6,9 +6,9 @@ import {
 	analyzeDayTypeCalendar,
 	loadCalendarFromDatabase,
 	loadCalendarFromSnapshots,
-} from "../../src/diagnostic/calendar";
-import type { TripSummary } from "../../src/diagnostic/fingerprint";
-import { formatCalendarReport } from "../../src/diagnostic/format";
+} from "@/diagnostic/calendar";
+import type { TripSummary } from "@/diagnostic/fingerprint";
+import { formatCalendarReport } from "@/diagnostic/format";
 
 function makeTripSummary(params: {
 	trainId: string;
@@ -315,7 +315,7 @@ describe("Empirical Calendar Identity & Set Difference Engine (§9)", () => {
 	});
 
 	it("executes calendar command through CLI runner", async () => {
-		const { createCli } = await import("../../src/cli");
+		const { createCli } = await import("@/cli");
 		const cli = createCli();
 		let output = "";
 		const originalLog = console.log;

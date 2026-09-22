@@ -2,12 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { KciClient } from "../../src/api/client";
+import { KciClient } from "@/api/client";
 import type {
 	DepartureBoardResponse,
 	StationMasterResponse,
-} from "../../src/api/schemas";
-import { executeCapture } from "../../src/capture/capture";
+} from "@/api/schemas";
+import { executeCapture } from "@/capture/capture";
 
 const TEST_SCRATCH_DIR = path.resolve(
 	process.cwd(),

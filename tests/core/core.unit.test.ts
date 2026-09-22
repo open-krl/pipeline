@@ -3,24 +3,24 @@ import { describe, expect, it } from "bun:test";
 import {
 	computeBoardResponseHash,
 	computeStationMasterHash,
-} from "../../src/archive/hashes";
-import { resolveStationCode, resolveTripStationCode } from "../../src/config";
-import { foldDayTypeRule, resolveDayType } from "../../src/core/calendar";
+} from "@/archive/hashes";
+import { resolveStationCode, resolveTripStationCode } from "@/config";
+import { foldDayTypeRule, resolveDayType } from "@/core/calendar";
 import {
 	cleanDestinationName,
 	parseRouteName,
 	resolveStationId,
-} from "../../src/core/route";
+} from "@/core/route";
 import {
 	DEAD_BAND_CUTOFF_SECS,
 	parseHMS,
 	resolveItinerarySecs,
 	secsToDisplay,
 	toServiceDaySecs,
-} from "../../src/core/time";
-import { parseTrainId } from "../../src/core/trainid";
-import { loadHolidays } from "../../src/db/holidays";
-import dayjs from "../../src/lib/dayjs";
+} from "@/core/time";
+import { parseTrainId } from "@/core/trainid";
+import { loadHolidays } from "@/db/holidays";
+import dayjs from "@/lib/dayjs";
 
 describe("src/core/trainid", () => {
 	it("parses base train with revision and fakultatif flag", () => {

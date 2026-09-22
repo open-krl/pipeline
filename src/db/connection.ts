@@ -17,8 +17,7 @@ export function initDb(path: string, schemaPath?: string) {
 	sqlite.exec("PRAGMA foreign_keys = ON;");
 
 	const resolvedSchemaPath =
-		schemaPath ??
-		fileURLToPath(new URL("../../db/schema.sql", import.meta.url));
+		schemaPath ?? fileURLToPath(new URL("@/db/schema.sql", import.meta.url));
 	const ddl = readFileSync(resolvedSchemaPath, "utf8");
 	sqlite.exec(ddl);
 

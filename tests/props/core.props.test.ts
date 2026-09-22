@@ -1,15 +1,15 @@
 // tests/props/core.props.test.ts
 import { expect, test } from "bun:test";
 import fc from "fast-check";
-import { canonicalSerialize, payloadHash } from "../../src/core/canonical";
+import { canonicalSerialize, payloadHash } from "@/core/canonical";
 import {
 	DEAD_BAND_CUTOFF_SECS,
 	parseHMS,
 	resolveItinerarySecs,
 	secsToDisplay,
 	toServiceDaySecs,
-} from "../../src/core/time";
-import { parseTrainId, TRAIN_ID_GRAMMAR } from "../../src/core/trainid";
+} from "@/core/time";
+import { parseTrainId, TRAIN_ID_GRAMMAR } from "@/core/trainid";
 
 const RUNS = 500;
 

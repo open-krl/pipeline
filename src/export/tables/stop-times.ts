@@ -1,5 +1,5 @@
 // src/export/tables/stop-times.ts
-import { secsToDisplay } from "../../core/time";
+import { secsToDisplay } from "@/core/time";
 import { formatCsv } from "../csv";
 import type { StopTimeRow } from "../types";
 

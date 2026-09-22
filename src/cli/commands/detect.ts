@@ -1,6 +1,6 @@
 import type { CAC } from "cac";
-import { executeDetect } from "../../diagnostic/detect";
-import { formatDetectReport } from "../../diagnostic/format";
+import { executeDetect } from "@/diagnostic/detect";
+import { formatDetectReport } from "@/diagnostic/format";
 import {
 	parseDataDir,
 	parseDayType,

@@ -3,10 +3,10 @@
 import { Database } from "bun:sqlite";
 import { describe, expect, it } from "bun:test";
 import { promises as fs } from "node:fs";
-import { type FetchFunction, KciClient } from "../../src/api/client";
-import type { DepartureBoardResponse } from "../../src/api/schemas";
-import { DRIFT_THRESHOLDS, executeDetect } from "../../src/diagnostic/detect";
-import { formatDetectReport } from "../../src/diagnostic/format";
+import { type FetchFunction, KciClient } from "@/api/client";
+import type { DepartureBoardResponse } from "@/api/schemas";
+import { DRIFT_THRESHOLDS, executeDetect } from "@/diagnostic/detect";
+import { formatDetectReport } from "@/diagnostic/format";
 
 describe("Operational Corridor Drift Probe (§9 Task 6.5, §12)", () => {
 	it("exports expected operational drift thresholds", () => {
