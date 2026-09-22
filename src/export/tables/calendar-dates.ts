@@ -1,5 +1,6 @@
 // src/export/tables/calendar-dates.ts
-import { getDayOfWeekWib } from "../../core/calendar";
+
+import dayjs from "../../lib/dayjs";
 import { formatCsv } from "../csv";
 import type { CalendarDateRow } from "../types";
 
@@ -41,8 +42,7 @@ export function generateCalendarDateRows(
 		}
 
 		// Parse holiday date as midday UTC to safely evaluate WIB day of week
-		const dateObj = new Date(`${h.holiday_date}T12:00:00Z`);
-		const dow = getDayOfWeekWib(dateObj);
+		const dow = dayjs(`${h.holiday_date}T12:00:00Z`).day();
 
 		// Mid-week holiday: Monday (1) through Friday (5)
 		if (dow >= 1 && dow <= 5) {

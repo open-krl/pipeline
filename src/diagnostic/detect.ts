@@ -8,12 +8,12 @@ import { CORRIDOR_REFERENCE_STATIONS, TIMEZONE } from "../config";
 import {
 	type DayType,
 	foldDayTypeRule,
-	formatDateWib,
 	HolidayFileSchema,
 	type HolidayItem,
 	resolveDayType,
 } from "../core/calendar";
 import { resolveSafePath } from "../core/path";
+import dayjs from "../lib/dayjs";
 import { resolveDiagnosticBaseline } from "./baseline";
 import { diffDepartureBoards } from "./board";
 import type {
@@ -102,7 +102,7 @@ export async function executeDetect(
 ): Promise<DetectResult> {
 	const cwd = options.cwd ?? process.cwd();
 	const now = options.date ?? new Date();
-	const dateStr = formatDateWib(now);
+	const dateStr = dayjs(now).format("YYYY-MM-DD");
 
 	// 1. Resolve Day Type
 	let dayType = options.dayType;

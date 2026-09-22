@@ -1,11 +1,12 @@
 import { KciClient } from "../api/client";
 import type { DayType } from "../archive/schemas";
 import { DEFAULT_REGION_SCOPE, type RegionScope } from "../config";
-import { formatDateWib, resolveDayType } from "../core/calendar";
+import { resolveDayType } from "../core/calendar";
 import { generateDefaultLogPath, StructuredLogger } from "../core/logger";
 import { resolveSafePath } from "../core/path";
 import { confirm as defaultPrompt, type PromptFn } from "../core/prompt";
 import { loadHolidays } from "../db/holidays";
+import dayjs from "../lib/dayjs";
 
 export interface CaptureOptions {
 	client?: KciClient;
@@ -33,7 +34,7 @@ export function resolveCaptureContext(options: CaptureOptions) {
 	const now = options.now ?? new Date();
 	const prompt = options.promptFn ?? defaultPrompt;
 	const holidays = loadHolidays(options.holidaysPath);
-	const snapshotDate = formatDateWib(now);
+	const snapshotDate = dayjs(now).format("YYYY-MM-DD");
 	const resolvedDayType = options.dayType ?? resolveDayType(now, holidays);
 
 	let logger = options.logger;

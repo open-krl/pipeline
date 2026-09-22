@@ -3,8 +3,8 @@ import { Database } from "bun:sqlite";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { scanTimetableVersions } from "../archive/snapshots";
-import { formatDateWib } from "../core/calendar";
 import { resolveSafePath } from "../core/path";
+import dayjs from "../lib/dayjs";
 import { evaluateReleaseGates } from "./gates";
 import {
 	DEFAULT_AGENCY_META,
@@ -125,7 +125,7 @@ export async function executeExport(
 		} else if (snapshots.length > 0) {
 			startDate = normalizeDateToGtfs(snapshots[0].snapshot_date);
 		} else {
-			startDate = normalizeDateToGtfs(formatDateWib(new Date()));
+			startDate = normalizeDateToGtfs(dayjs(new Date()).format("YYYY-MM-DD"));
 		}
 
 		let endDate: string;

@@ -5,8 +5,8 @@ import { promisify } from "node:util";
 import { snapshotDir } from "../archive/layout";
 import type { CaptureManifest } from "../archive/schemas";
 import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
-import { getDayOfWeekWibName } from "../core/calendar";
 import { resolveSafePath } from "../core/path";
+import dayjs from "../lib/dayjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -101,7 +101,7 @@ export function formatSnapshotTable(entries: SnapshotEntry[]): string {
 	const rows = entries.map((e) => [
 		`v${e.version}/${e.snapshotId}`,
 		e.manifest.snapshot_date,
-		`${getDayOfWeekWibName(new Date(e.manifest.snapshot_date))}`,
+		`${dayjs(e.manifest.snapshot_date).format("dddd")}`,
 		e.manifest.day_type,
 		e.manifest.status,
 		e.manifest.region_scope,

@@ -5,12 +5,7 @@ import {
 	computeStationMasterHash,
 } from "../../src/archive/hashes";
 import { resolveStationCode, resolveTripStationCode } from "../../src/config";
-import {
-	foldDayTypeRule,
-	formatDateWib,
-	getDayOfWeekWib,
-	resolveDayType,
-} from "../../src/core/calendar";
+import { foldDayTypeRule, resolveDayType } from "../../src/core/calendar";
 import {
 	cleanDestinationName,
 	parseRouteName,
@@ -25,6 +20,7 @@ import {
 } from "../../src/core/time";
 import { parseTrainId } from "../../src/core/trainid";
 import { loadHolidays } from "../../src/db/holidays";
+import dayjs from "../../src/lib/dayjs";
 
 describe("src/core/trainid", () => {
 	it("parses base train with revision and fakultatif flag", () => {
@@ -184,8 +180,8 @@ describe("src/core/calendar", () => {
 
 	it("formats date and extracts day of week under Asia/Jakarta clock", () => {
 		const dt = new Date("2026-09-17T03:00:00Z"); // 10:00 WIB on Thursday
-		expect(formatDateWib(dt)).toBe("2026-09-17");
-		expect(getDayOfWeekWib(dt)).toBe(4); // Thursday
+		expect(dayjs(dt).format("YYYY-MM-DD")).toBe("2026-09-17");
+		expect(dayjs(dt).day()).toBe(4); // Thursday
 	});
 
 	it("correctly evaluates statutory holiday in Asia/Jakarta timezone", () => {
