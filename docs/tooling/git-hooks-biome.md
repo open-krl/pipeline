@@ -137,10 +137,23 @@ pre-commit:
    Because `piped: true` halts the pipeline on the first failing job, the moment an unformatted file was staged, Job 2 detected the formatting violation and exited with status code `1`.
 3. **The Deadlock:**  
    Job 3 (`format` with `stage_fixed: true`) was never reached. The formatter never got the opportunity to reformat the file, and Lefthook never got the opportunity to auto-stage it.
-4. **The Baffling User Experience:**  
-   - Developer runs `git commit`.
-   - Lefthook stashes unstaged fixes (file flickers back to unformatted 1-liner).
-   - Job 2 crashes on formatting.
-   - Lefthook aborts commit and pops the stash (file flickers back to formatted 2-liner).
-   - Developer is left wondering why their commit failed on formatting when the file in their editor appears already formatted, and why `stage_fixed: true` didn't fix it.
+
+### The "File Flicker" Mystery Explained
+
+A common source of confusion is: *"If `stage_fixed: true` was never reached, why did my file flicker from formatted to unformatted and back to formatted during `git commit`?"*
+
+The hook was **never** formatting your file during the commit. The formatted version on disk was your own unstaged manual edit:
+
+1. **Step 1 (Staged unformatted):** You staged an unformatted change (`git add file.ts`).
+   * *Git Index (staged):* unformatted 1-liner
+   * *Working Tree (disk):* unformatted 1-liner
+2. **Step 2 (Manual fix unstaged):** You ran `bun run check --write` in your terminal. Biome formatted the file on disk, but you did not run `git add` afterwards.
+   * *Git Index (staged):* unformatted 1-liner
+   * *Working Tree (disk):* formatted 2-liner (unstaged)
+3. **Step 3 (`git commit` execution):**
+   * **Stash:** Lefthook stashed your unstaged edits to isolate the index. The file on disk rewound to match the staged 1-liner $\to$ *the line flickered back to 1 line in your editor*.
+   * **Fail:** Job 2 (`bun run check`) inspected the 1-liner on disk, caught the formatting error, and crashed.
+   * **Pop:** Because the commit aborted, Lefthook restored your stashed edits $\to$ *the line flickered back to the compliant 2 lines in your editor*.
+4. **The Takeaway:** The formatted version was your own manual unstaged change. Lefthook was simply stashing it and popping it back on abort!
+
 
