@@ -6,19 +6,19 @@ This document outlines the operational models, failure semantics, and configurat
 
 ## 1. Core Mechanics: Lefthook & Git Index Isolation
 
-When you run `git commit`, Lefthook orchestrates checks before Git constructs the commit object.
+When invoking `git commit`, Lefthook orchestrates checks before Git constructs the commit object.
 
 ### The Stashing Cycle
-Git pre-commit hooks are intended to validate **only the files staged in Git's index (`.git/index`)**, not the uncommitted edits sitting in your working directory.
+Git pre-commit hooks validate **only the files staged in Git's index (`.git/index`)**, isolating the commit artifact from in-progress working directory modifications.
 
-1. **Stash Unstaged Edits:** Lefthook automatically stashes any unstaged working directory changes before running your hook jobs.
+1. **Stash Unstaged Edits:** Lefthook automatically stashes any unstaged working directory changes before running configured jobs.
 2. **Execute Hook Pipeline:** The jobs run against the clean staged index.
-3. **Pop Stash:** Once the jobs finish (or fail), Lefthook restores the stashed unstaged changes back to your working directory.
+3. **Pop Stash:** Once the jobs finish (or fail), Lefthook restores the stashed working directory modifications.
 
 ### The Partial Staging Trap
-If you stage part of a file (e.g. lines 1–10) but have unstaged edits in the same file (e.g. lines 11–20):
-* When `git commit` runs, your editor may flicker as lines 11–20 temporarily disappear (because Lefthook stashed them).
-* If a pre-commit job modifies lines 1–10 and a subsequent job fails, Git aborts the commit. When Lefthook pops your unstaged edits back, Git attempts a three-way merge. If line numbers or offsets shifted during auto-fixing, you may hit a **stash merge conflict**.
+When a file is partially staged (e.g. lines 1–10 staged in index, lines 11–20 modified only in the working tree):
+* During pre-commit execution, working tree modifications temporarily disappear from disk because Lefthook stashes them to isolate the index.
+* If a pre-commit job auto-formats lines 1–10 and a subsequent job fails, Git aborts the commit. When Lefthook restores the unstaged modifications, Git executes a three-way merge. If line offsets or whitespace were altered during auto-formatting, Git may trigger a **stash merge conflict**.
 
 ---
 
@@ -104,11 +104,11 @@ pre-commit:
 
 ---
 
-## 4. Anti-Pattern: The Execution Order Deadlock
+## 4. Anti-Pattern: Inverted Pipeline Execution Deadlock
 
-A common mistake when setting up Lefthook with Biome is the **"Dead-on-Arrival" Formatter** anti-pattern.
+A common failure mode when configuring Lefthook with Biome is ordering non-mutating checks before the auto-fixer.
 
-### The Flawed Configuration
+### The Flawed Sequence
 ```yaml
 pre-commit:
   parallel: false
@@ -118,42 +118,19 @@ pre-commit:
       run: bun run typecheck
 
     - name: lint
-      glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"
-      exclude: "(^data/|^tests/fixtures/)"
       run: bun run check                      # ⚠️ Checks BOTH linting AND formatting!
 
     - name: format
-      glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"
-      exclude: "(^data/|^tests/fixtures/)"
       run: bun run format {staged_files}
       stage_fixed: true                       # 💀 NEVER REACHED
 ```
 
-### Why `stage_fixed: true` Never Ran
+### Architectural Breakdown
+1. **Semantic Collision:** `biome check` evaluates both lint diagnostics and formatting constraints. Assigning `bun run check` to a job labeled `lint` inadvertently enforces formatting rules.
+2. **Premature Piped Abort:** With `piped: true`, Lefthook halts the pre-commit pipeline upon encountering any non-zero exit code. Unformatted staged files cause the check step to crash immediately.
+3. **Stage-Fixed Starvation:** The format job containing `stage_fixed: true` is never reached. Automated formatting and re-staging cannot execute.
 
-1. **Semantic Collision (`check` vs `lint`):**  
-   In Biome, `biome check` checks both lint rules **and** code formatting. Naming the job `lint` while executing `bun run check` meant the job was secretly enforcing formatting.
-2. **Piped Abort Before Formatting:**  
-   Because `piped: true` halts the pipeline on the first failing job, the moment an unformatted file was staged, Job 2 detected the formatting violation and exited with status code `1`.
-3. **The Deadlock:**  
-   Job 3 (`format` with `stage_fixed: true`) was never reached. The formatter never got the opportunity to reformat the file, and Lefthook never got the opportunity to auto-stage it.
-
-### The "File Flicker" Mystery Explained
-
-A common source of confusion is: *"If `stage_fixed: true` was never reached, why did my file flicker from formatted to unformatted and back to formatted during `git commit`?"*
-
-The hook was **never** formatting your file during the commit. The formatted version on disk was your own unstaged manual edit:
-
-1. **Step 1 (Staged unformatted):** You staged an unformatted change (`git add file.ts`).
-   * *Git Index (staged):* unformatted 1-liner
-   * *Working Tree (disk):* unformatted 1-liner
-2. **Step 2 (Manual fix unstaged):** You ran `bun run check --write` in your terminal. Biome formatted the file on disk, but you did not run `git add` afterwards.
-   * *Git Index (staged):* unformatted 1-liner
-   * *Working Tree (disk):* formatted 2-liner (unstaged)
-3. **Step 3 (`git commit` execution):**
-   * **Stash:** Lefthook stashed your unstaged edits to isolate the index. The file on disk rewound to match the staged 1-liner $\to$ *the line flickered back to 1 line in your editor*.
-   * **Fail:** Job 2 (`bun run check`) inspected the 1-liner on disk, caught the formatting error, and crashed.
-   * **Pop:** Because the commit aborted, Lefthook restored your stashed edits $\to$ *the line flickered back to the compliant 2 lines in your editor*.
-4. **The Takeaway:** The formatted version was your own manual unstaged change. Lefthook was simply stashing it and popping it back on abort!
+For a detailed event trace, sequence diagram, and root-cause analysis of this phenomenon, see the dedicated incident analysis:  
+👉 [Tooling Post-Mortem: Lefthook Execution Deadlock & Stash Flicker](postmortem-lefthook-deadlock.md).
 
 
