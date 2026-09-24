@@ -101,3 +101,46 @@ pre-commit:
 
 * **Pros:** 100% deterministic. No file mutations during commit, no Git index modifications, and zero stash merge conflicts.
 * **Cons:** Requires running `bun run check --write` manually if formatting was missed before committing.
+
+---
+
+## 4. Anti-Pattern: The Execution Order Deadlock
+
+A common mistake when setting up Lefthook with Biome is the **"Dead-on-Arrival" Formatter** anti-pattern.
+
+### The Flawed Configuration
+```yaml
+pre-commit:
+  parallel: false
+  piped: true
+  jobs:
+    - name: typecheck
+      run: bun run typecheck
+
+    - name: lint
+      glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"
+      exclude: "(^data/|^tests/fixtures/)"
+      run: bun run check                      # ⚠️ Checks BOTH linting AND formatting!
+
+    - name: format
+      glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"
+      exclude: "(^data/|^tests/fixtures/)"
+      run: bun run format {staged_files}
+      stage_fixed: true                       # 💀 NEVER REACHED
+```
+
+### Why `stage_fixed: true` Never Ran
+
+1. **Semantic Collision (`check` vs `lint`):**  
+   In Biome, `biome check` checks both lint rules **and** code formatting. Naming the job `lint` while executing `bun run check` meant the job was secretly enforcing formatting.
+2. **Piped Abort Before Formatting:**  
+   Because `piped: true` halts the pipeline on the first failing job, the moment an unformatted file was staged, Job 2 detected the formatting violation and exited with status code `1`.
+3. **The Deadlock:**  
+   Job 3 (`format` with `stage_fixed: true`) was never reached. The formatter never got the opportunity to reformat the file, and Lefthook never got the opportunity to auto-stage it.
+4. **The Baffling User Experience:**  
+   - Developer runs `git commit`.
+   - Lefthook stashes unstaged fixes (file flickers back to unformatted 1-liner).
+   - Job 2 crashes on formatting.
+   - Lefthook aborts commit and pops the stash (file flickers back to formatted 2-liner).
+   - Developer is left wondering why their commit failed on formatting when the file in their editor appears already formatted, and why `stage_fixed: true` didn't fix it.
+
