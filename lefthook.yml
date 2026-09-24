@@ -2,14 +2,10 @@ pre-commit:
   parallel: false
   piped: true
   jobs:
-    - name: typecheck
-      run: bun run typecheck
-    - name: lint
-      glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"  
-      exclude: "(^data/|^tests/fixtures/)"
-      run: bun run check
-    - name: format
+    - name: auto-fix
       glob: "*.{js,ts,cjs,mjs,jsx,tsx,json,jsonc,css,graphql}"
       exclude: "(^data/|^tests/fixtures/)"
-      run: bun run format {staged_files}
+      run: bun run check --write {staged_files}
       stage_fixed: true
+    - name: typecheck
+      run: bun run typecheck
