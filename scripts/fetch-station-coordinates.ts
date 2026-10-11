@@ -1,6 +1,6 @@
 // scripts/fetch-station-coordinates.ts
 import { writeFileSync } from "node:fs";
-import { projectVersion } from "@/config";
+import { OVERPASS_API_HEADERS } from "@/config";
 
 const OVERPASS_ENDPOINT = "https://overpass-api.de/api/interpreter";
 
@@ -42,10 +42,7 @@ async function main() {
 
 	const response = await fetch(OVERPASS_ENDPOINT, {
 		method: "POST",
-		headers: {
-			"User-Agent": `KRL-Schedule-DB/${projectVersion}`,
-			"Content-Type": "application/x-www-form-urlencoded",
-		},
+		headers: OVERPASS_API_HEADERS,
 		body: `data=${encodeURIComponent(OVERPASS_QUERY)}`,
 	});
 

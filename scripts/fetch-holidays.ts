@@ -3,7 +3,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 import * as z from "zod";
-import { projectName, projectVersion } from "@/config";
+import { HOLIDAY_API_HEADERS } from "@/config";
 
 const HolidayApiItemSchema = z.object({
 	date: z
@@ -60,10 +60,7 @@ async function main() {
 	console.log(`Fetching ${year} statutory holidays from ${endpoint}...`);
 
 	const response = await fetch(endpoint, {
-		headers: {
-			"User-Agent": `${projectName}/${projectVersion}`,
-			Accept: "application/json",
-		},
+		headers: HOLIDAY_API_HEADERS,
 	});
 
 	if (!response.ok) {

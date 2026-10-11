@@ -3,9 +3,9 @@ import ky, { isHTTPError } from "ky";
 import PQueue from "p-queue";
 import {
 	API_BASE_URL,
-	API_HEADERS,
 	CONCURRENCY,
 	DEFAULT_TIME_WINDOW,
+	KCI_API_HEADERS,
 	PACING_MS,
 	RETRY,
 } from "../config";
@@ -144,7 +144,7 @@ export class KciClient {
 		this.ky = ky.create({
 			baseUrl: this.baseUrl,
 			fetch: this.fetchFn,
-			headers: { ...API_HEADERS },
+			headers: { ...KCI_API_HEADERS },
 			timeout: this.timeoutMs,
 			retry: {
 				limit: this.maxRetries,

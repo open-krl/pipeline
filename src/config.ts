@@ -7,10 +7,22 @@ export const projectName = "Open-KRL-Pipeline";
 
 export const API_BASE_URL = "https://www.kci.id";
 
-export const API_HEADERS = {
+export const DEFAULT_USER_AGENT = `${projectName}/${projectVersion}`;
+
+export const KCI_API_HEADERS = {
 	"User-Agent": "Mozilla/5.0",
 	Accept: "application/json, text/plain, */*",
 	Referer: "https://www.kci.id/",
+} as const;
+
+export const HOLIDAY_API_HEADERS = {
+	"User-Agent": DEFAULT_USER_AGENT,
+	Accept: "application/json",
+} as const;
+
+export const OVERPASS_API_HEADERS = {
+	"User-Agent": DEFAULT_USER_AGENT,
+	"Content-Type": "application/x-www-form-urlencoded",
 } as const;
 
 export const RegionScopeSchema = z.enum(["jabodetabek", "yogyakarta", "all"]);
