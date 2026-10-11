@@ -4,13 +4,14 @@ import packageJson from "../package.json" with { type: "json" };
 export const projectVersion = packageJson.version;
 
 export const projectName = "Open-KRL-Pipeline";
+export const projectRepository = "https://github.com/open-krl/pipeline";
 
 export const API_BASE_URL = "https://www.kci.id";
 
-export const DEFAULT_USER_AGENT = `${projectName}/${projectVersion}`;
+export const DEFAULT_USER_AGENT = `${projectName}/${projectVersion} (+${projectRepository})`;
 
 export const KCI_API_HEADERS = {
-	"User-Agent": "Mozilla/5.0",
+	"User-Agent": DEFAULT_USER_AGENT,
 	Accept: "application/json, text/plain, */*",
 	Referer: "https://www.kci.id/",
 } as const;
