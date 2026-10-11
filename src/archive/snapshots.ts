@@ -126,3 +126,63 @@ export async function readSnapshotBoards(
 
 	return boards;
 }
+
+/**
+ * Counts unique operational train/trip IDs across departure boards of a snapshot.
+ * Returns null if the boards directory does not exist or has no board files.
+ */
+export async function countSnapshotTrips(
+	dataDir: string,
+	version: number,
+	snapshotId: number,
+): Promise<number | null> {
+	const bDir = boardsDir(dataDir, version, snapshotId);
+	let entries: Dirent[];
+	try {
+		entries = await fs.readdir(bDir, { withFileTypes: true });
+	} catch {
+		return null;
+	}
+
+	const boardFiles = entries.filter(
+		(e) => e.isFile() && e.name.endsWith(".json"),
+	);
+	if (boardFiles.length === 0) {
+		return null;
+	}
+
+	const contents = await Promise.all(
+		boardFiles.map(async (file) => {
+			const filePath = resolveSafePath(path.join(bDir, file.name), bDir);
+			try {
+				return await fs.readFile(filePath, "utf-8");
+			} catch {
+				return null;
+			}
+		}),
+	);
+
+	const trainIds = new Set<string>();
+	for (const content of contents) {
+		if (!content) continue;
+		try {
+			const json = JSON.parse(content);
+			if (Array.isArray(json.data)) {
+				for (const item of json.data) {
+					if (
+						item?.train_id &&
+						typeof item.train_id === "string" &&
+						!item.train_id.includes("..") &&
+						/^[A-Za-z0-9_/-]+$/.test(item.train_id)
+					) {
+						trainIds.add(item.train_id);
+					}
+				}
+			}
+		} catch {
+			// Ignore corrupted board file when counting trips
+		}
+	}
+
+	return trainIds.size;
+}

@@ -72,7 +72,7 @@ Run via `bun run krl <command>` or by linking the binary.
 | `diff [...snapshots]` | Semantic diff between snapshots, versions, or train itineraries | `--v1 <ver> --v2 <ver>`, `--train <idA> <idB>`, `--detail`, `--git` |
 | `detect [version]` | Probes 3 corridor hubs (`MRI`, `BKS`, `RK`) for schedule edition drift | `--date <YYYY-MM-DD>`, `--tolerance <seconds>`, `--fail-on-drift` |
 | `calendar [version]` | 3-way set-difference report across weekday, Saturday, and Sunday | `--detail`, `--tolerance <seconds>`, `--json` |
-| `list-snapshots [version]` | Lists captured snapshots, day types, hashes, and Git status | `--data-dir <path>` |
+| `list-snapshots [version]` | Lists captured snapshots, day types, trip counts, hashes, and Git status | `--data-dir <path>` |
 | `commit-snapshot [ver] [id]` | Atomically commits a raw capture snapshot to Git | `--data-dir <path>` |
 
 ---

@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { manifestPath, snapshotDir, stationsPath } from "@/archive/layout";
 import type { CaptureManifest } from "@/archive/schemas";
 import {
+	countSnapshotTrips,
 	readSnapshotBoards,
 	readSnapshotStations,
 	scanSnapshots,
@@ -109,5 +110,48 @@ describe("src/archive/snapshots", () => {
 		const boards = await readSnapshotBoards(TEST_DATA_DIR, 1, 1);
 		expect(boards.size).toBe(2);
 		expect(Array.from(boards.keys())).toEqual(["BKS", "MRI"]);
+	});
+
+	it("counts unique trips across boards and returns null when boards are absent", async () => {
+		// Non-existent snapshot
+		const absentCount = await countSnapshotTrips(TEST_DATA_DIR, 1, 99);
+		expect(absentCount).toBeNull();
+
+		const snap = snapshotDir(TEST_DATA_DIR, 1, 1);
+		const boardsPath = path.join(snap, "boards");
+		await fs.mkdir(boardsPath, { recursive: true });
+
+		// Empty boards dir
+		const emptyCount = await countSnapshotTrips(TEST_DATA_DIR, 1, 1);
+		expect(emptyCount).toBeNull();
+
+		// Add boards with overlapping train IDs and invalid entries
+		await fs.writeFile(
+			path.join(boardsPath, "MRI.json"),
+			JSON.stringify({
+				status: 200,
+				data: [
+					{ train_id: "1001" },
+					{ train_id: "1002A" },
+					{ train_id: "1001" }, // duplicate
+					{ train_id: "../evil" }, // invalid path-like
+					{ train_id: "" }, // empty
+				],
+			}),
+		);
+		await fs.writeFile(
+			path.join(boardsPath, "BKS.json"),
+			JSON.stringify({
+				status: 200,
+				data: [
+					{ train_id: "1001" }, // duplicate across stations
+					{ train_id: "D1/R1173-2" }, // valid feeder train id
+				],
+			}),
+		);
+
+		const count = await countSnapshotTrips(TEST_DATA_DIR, 1, 1);
+		// 1001, 1002A, D1/R1173-2 = 3 unique valid trips
+		expect(count).toBe(3);
 	});
 });

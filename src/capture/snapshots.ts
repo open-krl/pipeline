@@ -4,7 +4,11 @@ import * as path from "node:path";
 import { promisify } from "node:util";
 import { snapshotDir } from "../archive/layout";
 import type { CaptureManifest } from "../archive/schemas";
-import { scanSnapshots, scanTimetableVersions } from "../archive/snapshots";
+import {
+	countSnapshotTrips,
+	scanSnapshots,
+	scanTimetableVersions,
+} from "../archive/snapshots";
 import { resolveSafePath } from "../core/path";
 import dayjs from "../lib/dayjs";
 
@@ -16,6 +20,7 @@ export interface SnapshotEntry {
 	manifest: CaptureManifest;
 	snapshotDir: string;
 	gitCommit: string | null;
+	tripCount: number | null;
 }
 
 export interface ListSnapshotsOptions {
@@ -63,17 +68,24 @@ export async function getSnapshotList(
 
 	for (const version of targetVersions) {
 		const snapshots = await scanSnapshots(dataDir, version);
-		for (const snap of snapshots) {
-			const snapDir = snapshotDir(dataDir, version, snap.id);
-			const gitCommit = await resolveSnapshotCommit(snapDir, cwd);
-			entries.push({
-				version,
-				snapshotId: snap.id,
-				manifest: snap.manifest,
-				snapshotDir: snapDir,
-				gitCommit,
-			});
-		}
+		const versionEntries = await Promise.all(
+			snapshots.map(async (snap) => {
+				const snapDir = snapshotDir(dataDir, version, snap.id);
+				const [gitCommit, tripCount] = await Promise.all([
+					resolveSnapshotCommit(snapDir, cwd),
+					countSnapshotTrips(dataDir, version, snap.id),
+				]);
+				return {
+					version,
+					snapshotId: snap.id,
+					manifest: snap.manifest,
+					snapshotDir: snapDir,
+					gitCommit,
+					tripCount,
+				};
+			}),
+		);
+		entries.push(...versionEntries);
 	}
 
 	return entries;
@@ -93,6 +105,7 @@ export function formatSnapshotTable(entries: SnapshotEntry[]): string {
 		"Day of Week",
 		"Day Type",
 		"Status",
+		"Trips",
 		"Region",
 		"Board Hash",
 		"Commit",
@@ -104,6 +117,7 @@ export function formatSnapshotTable(entries: SnapshotEntry[]): string {
 		`${dayjs(e.manifest.snapshot_date).format("dddd")}`,
 		e.manifest.day_type,
 		e.manifest.status,
+		e.tripCount !== null ? String(e.tripCount) : "-",
 		e.manifest.region_scope,
 		`${e.manifest.board_response_hash.slice(0, 8)}...`,
 		e.gitCommit ?? "(uncommitted)",

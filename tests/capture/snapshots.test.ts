@@ -65,24 +65,39 @@ describe("src/capture/snapshots", () => {
 			JSON.stringify(sampleManifest2, null, 2),
 		);
 
+		const snap1Boards = path.join(snap1Dir, "boards");
+		await fs.mkdir(snap1Boards, { recursive: true });
+		await fs.writeFile(
+			path.join(snap1Boards, "MRI.json"),
+			JSON.stringify({
+				status: 200,
+				data: [{ train_id: "2001" }, { train_id: "2002" }],
+			}),
+		);
+
 		const list = await getSnapshotList({ dataDir: TEST_DATA_DIR });
 		expect(list).toHaveLength(2);
 
 		expect(list[0].version).toBe(1);
 		expect(list[0].snapshotId).toBe(1);
 		expect(list[0].manifest.day_type).toBe("weekday");
+		expect(list[0].tripCount).toBe(2);
 
 		expect(list[1].version).toBe(1);
 		expect(list[1].snapshotId).toBe(2);
 		expect(list[1].manifest.day_type).toBe("saturday");
+		expect(list[1].tripCount).toBeNull();
 
 		const table = formatSnapshotTable(list);
 		expect(table).toContain("Snapshot");
 		expect(table).toContain("Date");
 		expect(table).toContain("Day Type");
+		expect(table).toContain("Trips");
 		expect(table).toContain("v1/1");
 		expect(table).toContain("v1/2");
 		expect(table).toContain("weekday");
+		expect(table).toContain("2");
+		expect(table).toContain("-");
 		expect(table).toContain("aaaaaaaa...");
 		expect(table).toContain("bbbbbbbb...");
 	});
