@@ -79,6 +79,7 @@ export type FetchFunction = (
 export interface KciClientOptions {
 	baseUrl?: string;
 	fetchFn?: FetchFunction;
+	userAgent?: string;
 	boardConcurrency?: number;
 	censusConcurrency?: number;
 	pacingMs?: number;
@@ -107,6 +108,7 @@ type Ky = ReturnType<typeof ky.create>;
 export class KciClient {
 	readonly baseUrl: string;
 	readonly fetchFn: FetchFunction;
+	readonly userAgent: string;
 	readonly boardSemaphore: AsyncSemaphore;
 	readonly censusSemaphore: AsyncSemaphore;
 	readonly pacingMs: number;
@@ -122,6 +124,7 @@ export class KciClient {
 	constructor(options: KciClientOptions = {}) {
 		this.baseUrl = `${(options.baseUrl ?? API_BASE_URL).replace(/\/+$/, "")}/`;
 		this.fetchFn = options.fetchFn ?? fetch;
+		this.userAgent = options.userAgent ?? KCI_API_HEADERS["User-Agent"];
 		this.boardSemaphore = new AsyncSemaphore(
 			options.boardConcurrency ?? CONCURRENCY.captureBoards,
 		);
@@ -141,10 +144,15 @@ export class KciClient {
 			strict: true,
 		});
 
+		const headers: Record<string, string> = {
+			...KCI_API_HEADERS,
+			"User-Agent": this.userAgent,
+		};
+
 		this.ky = ky.create({
 			baseUrl: this.baseUrl,
 			fetch: this.fetchFn,
-			headers: { ...KCI_API_HEADERS },
+			headers,
 			timeout: this.timeoutMs,
 			retry: {
 				limit: this.maxRetries,
