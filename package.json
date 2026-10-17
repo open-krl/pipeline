@@ -10,6 +10,7 @@
 		"typecheck": "tsc --noEmit",
 		"smoke": "bun scripts/smoke.ts",
 		"analyze:fixtures": "bun scripts/analyze-fixtures.ts",
+		"probe:ua": "bun scripts/probe-user-agents.ts",
 		"fetch:holidays": "bun scripts/fetch-holidays.ts",
 		"release:prep": "bun scripts/release-prepare.ts",
 		"release": "release-it",
